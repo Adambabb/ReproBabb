@@ -3,35 +3,25 @@ from PySide6.QtGui import QIcon, QPixmap,QAction;
 import sys,urllib.request
 import Player;
 import Motor;
+import Queue;
 from PySide6.QtCore import Qt,QTimer,QPoint,QUrl;
 import threading;
-import yt_dlp;
 
 lock=threading.Lock();
 
 class Start():
-    def __init__(self,config: dict):
+    def __init__(self,):
         self._app=QApplication([])
         self._player=Player.AudioController();
-        self._config=config
+        self._queue=Queue.SongQueue(self._player)
         self._window=QWidget()
         self._searchVer=0
 
 
 
-fetcherOpt={
-        "format":"bestaudio",
-        "noplaylist":True,
-        "quiet":False,
-    }
-start=Start(fetcherOpt);
 
+start=Start();
 
-def fetch(res):
-    with yt_dlp.YoutubeDL(fetcherOpt) as fetcher:
-        info=fetcher.extract_info(res,download=False)
-        url=info["url"]
-        start._player.play(url)
 
 def clickSearch():
     search=searchBox.text()
@@ -42,14 +32,22 @@ def clickSearch():
 def searchMotor(search,searchVer):
     res=Motor.searchBar(search)
     if searchVer == start._searchVer:
-        if isinstance(res,list):
-            if res[0]["status"] !="error":
-                fetching=threading.Thread(target=fetch,daemon=True,args=(res[0]["id"],))
+                fetching=threading.Thread(target=fetchSong,daemon=True,args=(res,))
                 fetching.start()
-        elif isinstance(res,dict):
-            if res["status"] !="error":
-                fetching=threading.Thread(target=fetch,daemon=True,args=(res["id"],))
-                fetching.start()
+
+def fetchSong(res):
+    if isinstance(res,list):
+        if res[0]["status"] !="error":
+            start._queue.NowPlaylist(res)
+            url=Motor.fetch(res[0]["id"])
+            start._player.play(url)
+    elif isinstance(res,dict):
+        if res["status"] !="error":
+            songs=[res]
+            start._queue.NowPlaylist(songs)
+            url=Motor.fetch(res["id"])
+            start._player.play(url)
+
 
 start._window.setWindowTitle("ReproBabb")
 start._window.setFixedSize(500,600)
@@ -101,15 +99,25 @@ HorizontalThumbnail=QHBoxLayout();
 HorizontalThumbnail.addStretch();
 HorizontalThumbnail.addWidget(thumbnailLabel)
 
+
 nextSong=QPushButton()
 icoNext=QIcon("./Assets/Next.png")
 nextSong.setIcon(icoNext)
+
+def nextSongPlay():
+    start._queue.nextBefore("next")
+
+   
+nextSong.clicked.connect(nextSongPlay)
 
 beforeSong=QPushButton()
 icoBefore=QIcon("./Assets/Before.png")
 beforeSong.setIcon(icoBefore)
 
+def beforeSongPlay():
+    start._queue.nextBefore("before")
 
+beforeSong.clicked.connect(beforeSongPlay)
 
     
 pause=QPushButton()

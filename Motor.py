@@ -1,4 +1,5 @@
 import ytmusicapi;
+import yt_dlp;
 
 searcher = ytmusicapi.YTMusic();
 
@@ -90,7 +91,15 @@ def searchBar(search):
         result=songs(search)
     return result
     
+fetcherOpt={
+        "format":"bestaudio",
+        "noplaylist":True,
+        "quiet":False,
+    }
     
-
-        
+def fetch(res):
+    with yt_dlp.YoutubeDL(fetcherOpt) as fetcher:
+        info=fetcher.extract_info(res,download=False)
+        url=info["url"]
+        return url
     

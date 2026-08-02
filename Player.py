@@ -3,7 +3,6 @@ import vlc
 class AudioController(QObject):
 
     state_changed = Signal(str)           #
-    metadata_ready = Signal(dict)         
     error_occurred = Signal(str)
     vol_changed = Signal(int)  
        
