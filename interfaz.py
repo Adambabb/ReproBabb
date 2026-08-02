@@ -4,11 +4,35 @@ import sys,urllib.request
 import Player;
 import Motor;
 import Queue;
-from PySide6.QtCore import Qt,QTimer,QPoint,QUrl;
+from PySide6.QtCore import Qt,QTimer,QPoint,QUrl,QObject,Signal;
 import threading;
 
 lock=threading.Lock();
 
+class thumbnail(QObject):
+    
+    thumbnailChange=Signal(bytes)
+    
+    def __init__(self, queue):
+            super().__init__()
+            self._queue = queue
+            self._queue.song_data.connect(self.downThumbnail)
+
+    
+    def downThumbnail(self,song):
+        if song["thumbnails"] != "":
+            url=song["thumbnails"][-1]["url"]
+            thread=threading.Thread(target=self.fetchThumbnail,daemon=True,args=(url,))
+            thread.start()
+
+    def fetchThumbnail(self,url):
+        try:
+            with urllib.request.urlopen(url) as response:
+                data=response.read()
+                self.thumbnailChange.emit(data)
+        except Exception as e:
+            print("Error fetching thumbnail:", e)
+    
 class Start():
     def __init__(self,):
         self._app=QApplication([])
@@ -16,8 +40,7 @@ class Start():
         self._queue=Queue.SongQueue(self._player)
         self._window=QWidget()
         self._searchVer=0
-
-
+        self._thumbnail=thumbnail(self._queue)
 
 
 start=Start();
@@ -39,14 +62,10 @@ def fetchSong(res):
     if isinstance(res,list):
         if res[0]["status"] !="error":
             start._queue.NowPlaylist(res)
-            url=Motor.fetch(res[0]["id"])
-            start._player.play(url)
     elif isinstance(res,dict):
         if res["status"] !="error":
             songs=[res]
             start._queue.NowPlaylist(songs)
-            url=Motor.fetch(res["id"])
-            start._player.play(url)
 
 
 start._window.setWindowTitle("ReproBabb")
@@ -100,6 +119,13 @@ HorizontalThumbnail.addStretch();
 HorizontalThumbnail.addWidget(thumbnailLabel)
 
 
+def updateThumbnail(data):
+    cover=QPixmap()
+    cover.loadFromData(data)
+    thumbnailLabel.setPixmap(cover)
+
+start._thumbnail.thumbnailChange.connect(updateThumbnail)
+
 nextSong=QPushButton()
 icoNext=QIcon("./Assets/Next.png")
 nextSong.setIcon(icoNext)
@@ -118,7 +144,6 @@ def beforeSongPlay():
     start._queue.nextBefore("before")
 
 beforeSong.clicked.connect(beforeSongPlay)
-
     
 pause=QPushButton()
 
