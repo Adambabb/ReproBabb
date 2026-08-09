@@ -1,73 +1,53 @@
-import ytmusicapi;
-import yt_dlp;
+import ytmusicapi
+import yt_dlp
+import urllib.parse
 
 searcher = ytmusicapi.YTMusic();
 
       
-def playlist(search):
-    res=search.split("list=")[1].split("&si")[0]
-    res=searcher.get_playlist(res,limit=None)
-    songList=[]
-    if len(res.get("tracks",[]))>0 :
-        tracks=res["tracks"]
+def playlist_data(playlist_id):
+    raw_playlist=searcher.get_playlist(playlist_id,limit=None)
+    song_list=[]
+    if len(raw_playlist.get("tracks",[]))>0 :
+        tracks=raw_playlist["tracks"]
         for song in tracks:
-            song_info={
-                "status":"success",
-                "title": song["title"],
-                "id": song["videoId"],
-                "duration": song["duration_seconds"],
-                "thumbnails": song["thumbnails"],
-                "artists": song["artists"]
-            }
-            songList.append(song_info)
-        
-        return songList
+            formatted_song=music_data(song)
+            if formatted_song["status"]=="error":
+                continue
+            song_list.append(formatted_song)
+        return song_list
     else:
-        song_info={
-            "status":"error",
-            "title": "Not found",
-            "id": "",
-            "duration": "",
-            "thumbnails": "",
-            "artists": ""
-        }
-        songList.append(song_info)
-    return songList
+        formatted_song=music_data(None)
+        song_list.append(formatted_song)
+        return song_list
 
-def songs(search):
-    res=searcher.search(search,filter="songs")
-    if len(res)>0 :
+def song_data(song_id):
+    raw_song=searcher.search(song_id,filter="songs")
+    if raw_song:
+        formatted_song=music_data(raw_song[0])
+        return formatted_song
+    else:
+        formatted_song=music_data(None)
+        return formatted_song
+
+def song_link_data(song_link_id):
+    raw_song_link=searcher.get_song(song_link_id)
+    if raw_song_link:
+        formatted_song=music_data(raw_song_link)
+        return formatted_song
+    else:
+        formatted_song=music_data(None)
+        return formatted_song
+
+def music_data(raw_song):
+    if raw_song:
         song={
             "status":"success",
-            "title": res[0]["title"],
-            "id": res[0]["videoId"],
-            "duration": res[0]["duration_seconds"],
-            "thumbnails": res[0]["thumbnails"],
-            "artists": res[0]["artists"]
-        }
-        return song
-    else:
-        song={
-            "status":"error",
-            "title": "Not found",
-            "id": "",
-            "duration": "",
-            "thumbnails": "",
-            "artists": ""
-        }
-        return song
-    
-def songsLink(search):
-    res=search.split("v=")[1].split("&si")[0]
-    res=searcher.search(res)
-    if len(res)>0 :
-        song={
-            "status":"success",
-            "title": res[0]["title"],
-            "id": res[0]["videoId"],
-            "duration": res[0]["duration_seconds"],
-            "thumbnails": res[0]["thumbnails"],
-            "artists": res[0]["artists"]
+            "title": raw_song["title"],
+            "id": raw_song["videoId"],
+            "duration": raw_song["duration_seconds"],
+            "thumbnails": raw_song["thumbnails"],
+            "artists": raw_song["artists"]
         }
         return song
     else:
@@ -81,25 +61,36 @@ def songsLink(search):
         }
         return song
 
-
-def searchBar(search):
-    if "youtube" in search and "list=" in search:
-        result=playlist(search)
-    elif "youtube" in search and "v=" in search:
-        result=songsLink(search)
+def search_bar(user_input):
+    if "http" in user_input:
+        result=None
+        parsed_url=urllib.parse.urlparse(user_input)
+        params=urllib.parse.parse_qs(parsed_url.query)
+        if "list" in params:
+            result=playlist_data(params["list"][0])
+        elif "v" in params:
+            result=song_link_data(params["v"][0])
+        else:
+            result=song_data(user_input)
     else:
-        result=songs(search)
+        result=song_data(user_input)
     return result
     
-fetcherOpt={
+fetcher_options={
         "format":"bestaudio",
         "noplaylist":True,
         "quiet":False,
     }
     
-def fetch(res):
-    with yt_dlp.YoutubeDL(fetcherOpt) as fetcher:
-        info=fetcher.extract_info(res,download=False)
-        url=info["url"]
-        return url
-    
+def fetch(video_id):
+    with yt_dlp.YoutubeDL(fetcher_options) as fetcher:
+        try:
+            info=fetcher.extract_info(video_id,download=False)
+            fetch_result={"url": info["url"],
+                         "status": "success"}
+            return fetch_result
+        except Exception as e:
+            error_message = str(e)
+            fetch_result={"error": error_message,
+                         "status": "error"}
+            return fetch_result
