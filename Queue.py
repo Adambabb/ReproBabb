@@ -88,4 +88,3 @@ class SongQueue(QObject):
                     self._current_index+=1
                     if self._current_index < len(self._songs_list):
                         song= self._songs_list[self._current_index]
-        

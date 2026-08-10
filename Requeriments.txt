@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 PySide6
 yt-dlp
 ytmusicapi
+=======
+PySide6
+yt-dlp
+ytmusicapi
+>>>>>>> 5238f11786b714cfbc4e32edb44a68d82c6712fd
 python-vlc
