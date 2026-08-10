@@ -2,7 +2,7 @@ import ytmusicapi
 import yt_dlp
 import urllib.parse
 
-searcher = ytmusicapi.YTMusic();
+searcher = ytmusicapi.YTMusic()
 
       
 def playlist_data(playlist_id):
@@ -15,6 +15,8 @@ def playlist_data(playlist_id):
             if formatted_song["status"]=="error":
                 continue
             song_list.append(formatted_song)
+        if len(song_list)==0:
+                song_list.append(music_data(None))
         return song_list
     else:
         formatted_song=music_data(None)
@@ -31,9 +33,9 @@ def song_data(song_id):
         return formatted_song
 
 def song_link_data(song_link_id):
-    raw_song_link=searcher.get_song(song_link_id)
+    raw_song_link=searcher.search(song_link_id,filter="songs")
     if raw_song_link:
-        formatted_song=music_data(raw_song_link)
+        formatted_song=music_data(raw_song_link[0])
         return formatted_song
     else:
         formatted_song=music_data(None)

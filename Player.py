@@ -1,10 +1,11 @@
 from PySide6.QtCore import QObject,Signal
 import vlc
+
 class AudioController(QObject):
 
-    state_changed = Signal(str)           #
+    state_changed = Signal(str)
     error_occurred = Signal(str)
-    vol_changed = Signal(int)  
+    volume_changed = Signal(int)  
        
     
     
@@ -20,41 +21,17 @@ class AudioController(QObject):
         
         super().__init__()
         self._status = "idle"
-        self._player_State=""
-        self._vol=50
+        self._volume=50
         self.player = vlc.MediaPlayer()
         self._event_manager = self.player.event_manager()
         for event in events:
-            self._event_manager.event_attach(event,self.getVlcState)
-            
-    def displayStatus(self):
-        new_Status=""
-        if self._player_State=="Playing":
-            new_Status="Playing"
-        elif self._player_State=="Cannot Reproduce":
-            new_Status="Cannot Reproduce error"
-        elif self._player_State=="Paused":
-            new_Status="Paused"
-        elif  self._player_State=="Stopped":
-            new_Status="Song Stopped"
-        elif  self._player_State=="Ended Media":
-            new_Status="Ended Song"
-        elif self._player_State=="No content":
-            new_Status="No content"
-        elif self._player_State=="Loading Url" or self._player_State=="Loading Song":
-            new_Status="Loading"
-        else:
-            new_Status="Error"
-        if new_Status != self._status:
-            self._status=new_Status
-            self.state_changed.emit(self._status)
-  
+            self._event_manager.event_attach(event,self._on_vlc_event)
 
-    def getVlcState(self,state):
-        vlcState=self.player.get_state()
-        self.vlcStatus(vlcState)
+    def _on_vlc_event(self,event):
+        vlc_state=self.player.get_state()
+        self._process_vlc_state(vlc_state)
         
-    def vlcStatus(self,state):
+    def _process_vlc_state(self,state):
         match state:
             case vlc.State.Opening:
                 state="Loading Url"
@@ -77,9 +54,9 @@ class AudioController(QObject):
                 print("Error")
                 state=""
                 return
-        if self._player_State != state:
-            self._player_State=state   
-            self.displayStatus()                               
+        if self._status != state:
+            self._status=state   
+            self.state_changed.emit(self._status)                          
 
             
     def play(self, url: str):
@@ -96,24 +73,19 @@ class AudioController(QObject):
             self.player.stop()
 
     def set_volume(self, value: int):
-        if value >=0 and value <= 100:
-            vol3=value*3
-            self.player.audio_set_volume(vol3)
-            self._vol=value
-            self.vol_changed.emit(self._vol)
-        else:
-            self.player.audio_set_volume(50)
-            self._vol=50
-            self.vol_changed.emit(self._vol)
+            self.player.audio_set_volume(value)
+            self._volume=value
+            self.volume_changed.emit(self._volume)
+
 
 
     def get_state(self) -> str: return self._status
-    def get_Vol(self)-> int: return self._vol
+    def get_volume(self)-> int: return self._volume
     
     
     
-    def pausePlay(self):
-        if self._player_State=="Playing":
+    def toggle_pause_play(self):
+        if self._status=="Playing":
             self.player.pause()
         else:
             self.player.play()        
