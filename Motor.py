@@ -33,10 +33,14 @@ def song_data(song_id):
         return formatted_song
 
 def song_link_data(song_link_id):
-    raw_song_link=searcher.search(song_link_id,filter="songs")
+    raw_song_link=searcher.search(song_link_id)
     if raw_song_link:
-        formatted_song=music_data(raw_song_link[0])
-        return formatted_song
+        try:
+            formatted_song=music_data(raw_song_link[0])
+            return formatted_song
+        except Exception as e:
+            error_message = str(e)
+            print(error_message)
     else:
         formatted_song=music_data(None)
         return formatted_song
