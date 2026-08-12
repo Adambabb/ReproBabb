@@ -89,3 +89,12 @@ class AudioController(QObject):
             self.player.pause()
         else:
             self.player.play()        
+
+    def get_current_time(self):
+        return self.player.get_time()
+    
+    def get_length(self):
+            return self.player.get_length()
+
+    def set_actual_time(self,new_time):
+        self.player.set_time(new_time)

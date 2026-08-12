@@ -4,7 +4,7 @@ import sys,urllib.request
 import Player
 import Motor
 import Queue
-from PySide6.QtCore import Qt,QPoint,QObject,Signal
+from PySide6.QtCore import Qt,QPoint,QObject,Signal,QTimer
 import threading
 import os
 
@@ -77,7 +77,24 @@ class MainWindow():
         thumbnail_layout.addStretch()
         
         vertical_layout.addLayout(thumbnail_layout)
-                
+         
+        self.time_layout=QHBoxLayout()
+        
+        self.time_slider=QSlider(Qt.Horizontal)
+        self.current_time_label=QLabel()
+        self.current_time_label.setText("00:00")
+        self.total_time_label=QLabel()
+        self.total_time_label.setText("00:00")
+        self.time_layout.addWidget(self.current_time_label)
+        self.time_layout.addWidget(self.time_slider)
+        self.time_layout.addWidget(self.total_time_label)
+        
+        vertical_layout.addLayout(self.time_layout)
+        
+        self._song_timer=QTimer()
+        self._song_timer.timeout.connect(self.update_timeline)
+        self.time_slider.sliderReleased.connect(self.update_current_time)
+        
         volume_slider=QSlider(Qt.Horizontal)
         volume_slider.setMaximum(100)
         volume_slider.setMinimum(0)
@@ -182,11 +199,36 @@ class MainWindow():
         if state=="Playing":
             ico_pause_play=QIcon(self.program_location("Pause.png"))
             self.pause.setIcon(ico_pause_play)
+            self._song_timer.start(300)
         else:
             ico_pause_play=QIcon(self.program_location("Play.png"))
             self.pause.setIcon(ico_pause_play)
+            self._song_timer.stop()
 
     
+    def update_timeline(self):
+        duration=self._player.get_length();
+        if duration >0:
+            
+            self.time_slider.setMaximum(duration)
+            current_time=self._player.get_current_time()
+            if not self.time_slider.isSliderDown():
+                self.time_slider.setValue(current_time)
+            current_time_mins=(current_time//1000)//60
+            current_time_seconds=(current_time//1000)%60
+            
+            formated_time=f"{current_time_mins:02d}:{current_time_seconds:02d}"
+            self.current_time_label.setText(formated_time)
+            
+            total_time_mins=(duration//1000)//60
+            total_time_seconds=(duration//1000)%60
+            formated_total_time=f"{total_time_mins:02d}:{total_time_seconds:02d}"
+            self.total_time_label.setText(formated_total_time)
+        else:
+            self.time_slider.setMaximum(0)
+
+    def update_current_time(self):
+        self._player.set_actual_time(self.time_slider.value())
     
 start=MainWindow()
 close=start._app.exec()
