@@ -20,8 +20,9 @@ class SongQueue(QObject):
         self._timer_click.timeout.connect(self.process_click)
         self.player.state_changed.connect(self.next_song_queue)
         self._is_shuffle=False
-        self._shuffle_song_list=[];
-        self._shuffle_current_index=0;
+        self._shuffle_song_list=[]
+        self._shuffle_current_index=0
+        self.fetch_version=0
 
     def playing_playlist(self, playlist):
         song_to_play=None
@@ -46,6 +47,7 @@ class SongQueue(QObject):
         with self._lock:
             if not self._songs_list:
                 self._click_count=0
+                
                 self._direction=""
                 return
             if self._is_shuffle:
@@ -103,8 +105,12 @@ class SongQueue(QObject):
                 fetch_thread.start()
     
     def _fetch_song(self, song):
+        self.fetch_version+=1
+        current_fetch_version=self.fetch_version
         while song is not None:
             status_fetch=Motor.fetch(song["id"])
+            if current_fetch_version != self.fetch_version:
+                break
             if status_fetch["status"]=="success":
                 url=status_fetch["url"]
                 self.song_data.emit(song)
@@ -115,9 +121,19 @@ class SongQueue(QObject):
                 print("Error:", error)
                 song=None
                 with self._lock:
-                    self._current_index+=1
-                    if self._current_index < len(self._songs_list):
-                        song= self._songs_list[self._current_index]
+                    if self._is_shuffle:
+                        self._shuffle_current_index+=1
+                        if self._shuffle_current_index < len(self._shuffle_song_list):
+                            self._current_index= self._shuffle_song_list[self._shuffle_current_index]
+                            song=self._songs_list[self._current_index]
+                        else:
+                            self._shuffle_current_index=len(self._shuffle_song_list)
+                            self._current_index=self._shuffle_current_index
+                    else:
+                        self._current_index+=1
+                        if self._current_index < len(self._songs_list):
+                            song= self._songs_list[self._current_index]
+                        
     
     def shuffle_queue(self):
         with self._lock:
@@ -130,5 +146,7 @@ class SongQueue(QObject):
                 self._shuffle_song_list=[]
                 self._shuffle_song_list=list(range(len(self._songs_list)))
                 random.shuffle(self._shuffle_song_list)
-                self._shuffle_current_index=self._shuffle_song_list.index(self._current_index)
-                    
+                if self._current_index < len(self._songs_list):
+                    self._shuffle_current_index=self._shuffle_song_list.index(self._current_index)
+                else:
+                    self._shuffle_current_index=0
