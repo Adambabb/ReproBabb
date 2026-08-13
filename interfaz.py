@@ -122,7 +122,6 @@ class MainWindow():
         self.pause.clicked.connect(self.toggle_play_pause)       
         self._player.state_changed.connect(self.update_play_icon)
 
-
         next_song=QPushButton()
         self._ico_next=QIcon(self.program_location("Next.png"))
         next_song.setIcon(self._ico_next)        
@@ -130,6 +129,14 @@ class MainWindow():
         
         next_song.clicked.connect(self.next_song_play)
         
+        self.shuffle_button=QPushButton()
+        self.shuffle_button.setCheckable(True)
+        self.shuffle_icon=QIcon(self.program_location("Shuffle.png"))
+        self.shuffle_button.setIcon(self.shuffle_icon)
+        self.shuffle_button.clicked.connect(self.shuffle)
+        
+        controllers_layout.addWidget(self.shuffle_button)
+                
         vertical_layout.addLayout(controllers_layout)
         
         
@@ -168,7 +175,8 @@ class MainWindow():
             if res["status"] !="error":
                 songs=[res]
                 self._queue.playing_playlist(songs)
-
+        self.shuffle_button.setChecked(False)
+        
     def settings_menu(self):
         self.settings.exec(self._window.mapToGlobal(QPoint(self._window.width()//2-self.settings.sizeHint().width()//2,self._window.height()//2-self.settings.sizeHint().height()//2)))
 
@@ -229,6 +237,9 @@ class MainWindow():
 
     def update_current_time(self):
         self._player.set_actual_time(self.time_slider.value())
+        
+    def shuffle(self):
+        self._queue.shuffle_queue()
     
 start=MainWindow()
 close=start._app.exec()
