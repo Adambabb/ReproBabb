@@ -12,8 +12,8 @@ class SongQueue(QObject):
         self.player = player
         self._current_index=0
         self._songs_list=[]
-        self._direction=""
         self._click_count=0
+        self._retry_count=0
         self._timer_click=QTimer()
         self._lock=threading.Lock()
         self._timer_click.setSingleShot(True)
@@ -39,46 +39,25 @@ class SongQueue(QObject):
     
     def next_or_previous(self,direction):
         with self._lock:
-            self._direction=direction
-            self._click_count+=1
+            if direction == "next":
+                self._click_count+=1
+            elif direction=="previous":
+                self._click_count-=1
         self._timer_click.start(200)
     
     def process_click(self):
         with self._lock:
-            if not self._songs_list:
+            if not self._songs_list or self._click_count==0:
                 self._click_count=0
-                
-                self._direction=""
                 return
             if self._is_shuffle:
-                if self._direction=="previous":
-                    if self._shuffle_current_index > 0 and self._shuffle_current_index - self._click_count >= 0:
-                        self._shuffle_current_index-=self._click_count
-                        self._current_index=self._shuffle_song_list[self._shuffle_current_index]  
-                    else:
-                        self._shuffle_current_index=0
-                        self._current_index=self._shuffle_song_list[self._shuffle_current_index]  
-                else:
-                    if self._shuffle_current_index + self._click_count < len(self._shuffle_song_list):
-                        self._shuffle_current_index+=self._click_count
-                        self._current_index=self._shuffle_song_list[self._shuffle_current_index]  
-                    else:
-                        self._shuffle_current_index=len(self._shuffle_song_list)-1
-                        self._current_index=self._shuffle_song_list[self._shuffle_current_index]
+                self._shuffle_current_index=(max(0,min(len(self._shuffle_song_list)-1,self._shuffle_current_index+self._click_count)))
+                self._current_index=self._shuffle_song_list[self._shuffle_current_index]
             else:
-                if self._direction=="previous":
-                    if self._current_index > 0 and self._current_index - self._click_count >= 0:
-                        self._current_index-=self._click_count  
-                    else:
-                        self._current_index=0
-                else:
-                    if self._current_index + self._click_count < len(self._songs_list):
-                        self._current_index+=self._click_count
-                    else:
-                        self._current_index=len(self._songs_list)-1
+               self._current_index= max(0,min(len(self._songs_list)-1,self._current_index+self._click_count))
             self._click_count=0
-            self._direction=""
-            song=self._songs_list[self._current_index]
+            self._retry_count=0
+            song=self.get_song_index()
         fetch_thread=threading.Thread(target=self._fetch_song,daemon=True,args=(song,))
         fetch_thread.start()
         
@@ -89,6 +68,18 @@ class SongQueue(QObject):
             with self._lock:
                 self.increment_index()
                 song_to_play=self.get_song_index()
+                self._retry_count=0
+        elif state=="Cannot Reproduce":
+            if self._retry_count < 7:
+                with self._lock:
+                    song_to_play=self.get_song_index()
+                    self._retry_count+=1
+            else:
+                with self._lock:
+                    self.increment_index()
+                    song_to_play=self.get_song_index()
+                    self._retry_count=0
+
         if song_to_play != None:
                 fetch_thread=threading.Thread(target=self._fetch_song,daemon=True,args=(song_to_play ,))
                 fetch_thread.start()

@@ -21,6 +21,7 @@ class AudioController(QObject):
         
         super().__init__()
         self._status = "idle"
+        self._has_played=False
         self._volume=50
         self.player = vlc.MediaPlayer()
         self._event_manager = self.player.event_manager()
@@ -40,13 +41,17 @@ class AudioController(QObject):
             case vlc.State.NothingSpecial:
                 state="No content"
             case  vlc.State.Playing:
+                self._has_played=True
                 state="Playing"
             case vlc.State.Paused:
                 state="Paused"
             case vlc.State.Stopped:
                 state="Stopped"
             case vlc.State.Ended:
-                state="Ended Media"
+                if  self._has_played==True:
+                    state="Ended Media"
+                else:
+                    state="Cannot Reproduce"
             case vlc.State.Error:
                 state="Cannot Reproduce"
                 self.error_occurred.emit(vlc.libvlc_errmsg() or "Unknown error")            
@@ -60,6 +65,7 @@ class AudioController(QObject):
 
             
     def play(self, url: str):
+        self._has_played=False
         media=vlc.Media(url)
         self.player.set_media(media)
         self.player.play()
