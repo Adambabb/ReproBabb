@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QApplication, QLabel, QWidget, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,QSlider,QMenu
-from PySide6.QtGui import QIcon, QPixmap,QAction
+from PySide6.QtGui import QIcon, QPixmap,QAction,QShortcut,QKeySequence
 import sys,urllib.request
 import Player
 import Motor
@@ -53,11 +53,11 @@ class MainWindow():
         
         self._search_box=QLineEdit()
         search_settings_layout.addWidget(self._search_box)
-
+        self._search_box.returnPressed.connect(self.click_search)
+        
         search_button=QPushButton("search")
         search_settings_layout.addWidget(search_button)
         search_button.clicked.connect(self.click_search)
-
 
         settings_button=QPushButton()
         ico_settings=QIcon(self.program_location("Settings.png"))
@@ -95,13 +95,19 @@ class MainWindow():
         self._song_timer.timeout.connect(self.update_timeline)
         self.time_slider.sliderReleased.connect(self.update_current_time)
         
-        volume_slider=QSlider(Qt.Horizontal)
-        volume_slider.setMaximum(100)
-        volume_slider.setMinimum(0)
-        volume_slider.setValue(50)
-        volume_slider.valueChanged.connect(self._player.set_volume)
+        self.volume_slider=QSlider(Qt.Horizontal)
+        self.volume_slider.setMaximum(100)
+        self.volume_slider.setMinimum(0)
+        self.volume_slider.setValue(50)
+        self.volume_slider.valueChanged.connect(self._player.set_volume)
         volume_layout=QHBoxLayout()
-        volume_layout.addWidget(volume_slider)
+        volume_layout.addWidget(self.volume_slider)
+        
+        self.shortcut_volume_up = QShortcut(QKeySequence("Up"), self._window)
+        self.shortcut_volume_up.activated.connect(self.volume_up)
+        
+        self.shortcut_volume_up = QShortcut(QKeySequence("Down"), self._window)
+        self.shortcut_volume_up.activated.connect(self.volume_down)
         
         vertical_layout.addLayout(volume_layout)
         
@@ -112,6 +118,9 @@ class MainWindow():
         previous_song.setIcon(self._ico_previous)
         controllers_layout.addWidget(previous_song)   
         
+        self.shortcut_previous_song = QShortcut(QKeySequence("Left"), self._window)
+        self.shortcut_previous_song.activated.connect(self.previous_song_play)
+        
         previous_song.clicked.connect(self.previous_song_play)
 
         self.pause=QPushButton()
@@ -121,11 +130,17 @@ class MainWindow():
 
         self.pause.clicked.connect(self.toggle_play_pause)       
         self._player.state_changed.connect(self.update_play_icon)
-
+        
+        self.shortcut_pause_play = QShortcut(QKeySequence("Space"), self._window)
+        self.shortcut_pause_play.activated.connect(self.toggle_play_pause)
+        
         next_song=QPushButton()
         self._ico_next=QIcon(self.program_location("Next.png"))
         next_song.setIcon(self._ico_next)        
         controllers_layout.addWidget(next_song)
+        
+        self.shortcut_next_song = QShortcut(QKeySequence("Right"), self._window)
+        self.shortcut_next_song.activated.connect(self.next_song_play)
         
         next_song.clicked.connect(self.next_song_play)
         
@@ -240,6 +255,12 @@ class MainWindow():
         
     def shuffle(self):
         self._queue.shuffle_queue()
+        
+    def volume_up(self):
+        self.volume_slider.setValue(self.volume_slider.value()+10)
+    
+    def volume_down(self):
+            self.volume_slider.setValue(self.volume_slider.value()-10)
     
 start=MainWindow()
 close=start._app.exec()
