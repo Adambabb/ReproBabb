@@ -1,5 +1,5 @@
-from PySide6.QtWidgets import QApplication, QLabel, QWidget, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,QSlider,QMenu
-from PySide6.QtGui import QIcon, QPixmap,QAction,QShortcut,QKeySequence
+from PySide6.QtWidgets import QApplication, QLabel, QWidget, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,QSlider,QMenu,QSizePolicy
+from PySide6.QtGui import QIcon, QPixmap,QAction,QShortcut,QKeySequence,QColor,QPainter
 import sys,urllib.request
 import Player
 import Motor
@@ -7,6 +7,7 @@ import Queue
 from PySide6.QtCore import Qt,QPoint,QObject,Signal,QTimer
 import threading
 import os
+import random
 
 class ThumbnailFetcher(QObject):
     
@@ -32,7 +33,54 @@ class ThumbnailFetcher(QObject):
                 self.thumbnail_changed.emit(data)
         except Exception as e:
             print("Error fetching thumbnail:", e)
+            
+class time_design(QWidget):
     
+    def __init__(self,cover_color,song_duration,song_current_time):
+        super().__init__()
+        self.bars_number=0
+        self.bars_height=[random.uniform(0.1,0.9) for i  in range(50) ]
+        self.bars_height_timer=QTimer()
+        self.bars_height_timer.timeout.connect(self.update_heights)        
+        self.bar_gap=0
+        self.bars_wave=0.0
+        self.song_duration=0
+        self.song_current_time=0
+        self.cover_color=cover_color
+        self.is_dragging=False
+    
+    def update_heights(self):
+        self.bars_height=[random.uniform(0.1,0.9) for i  in range(50) ]
+        self.update()
+    
+    
+    def paintEvent(self,event):
+        visaulizer=QPainter(self)
+        visaulizer.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if self.width() > 200:
+            self.bars_number=50
+            self.bar_gap=2
+        else:
+            self.bars_number=20
+            self.bar_gap=1
+        bar_width=(self.width()/self.bars_number)-self.bar_gap
+        self.bars_number_color=0
+        if self.song_duration >0:
+            percent_song_duration=self.song_current_time/self.song_duration
+            self.bars_number_color=self.bars_number*percent_song_duration
+        for i in range(self.bars_number):
+            position_x=i*(bar_width+self.bar_gap)
+            bar_pixel_height=self.height() * self.bars_height[i]
+            position_y=(self.height()-(bar_pixel_height))/2
+            if self.bars_number_color >= i:
+                visaulizer.setBrush(self.cover_color)
+            else:
+                cover_color_alpha=QColor(self.cover_color)
+                cover_color_alpha.setAlpha(75)
+                visaulizer.setBrush(cover_color_alpha)
+            visaulizer.drawRect(position_x,position_y,bar_width,bar_pixel_height)
+
+                
 class MainWindow():
     def __init__(self):
         
@@ -45,7 +93,7 @@ class MainWindow():
         
         self._location=os.path.dirname(__file__)
         self._window.setWindowTitle("ReproBabb")
-        self._window.setFixedSize(500,600)
+        self._window.resize(500,600)
         self._window.setWindowIcon(QIcon(self.program_location("ReproBabb.png")))
     
         vertical_layout=QVBoxLayout()
@@ -65,21 +113,27 @@ class MainWindow():
         search_settings_layout.addWidget(settings_button)
         settings_button.clicked.connect(self.settings_menu)
         
-        vertical_layout.addLayout(search_settings_layout)
+        vertical_layout.addLayout(search_settings_layout,1)
         
         self._thumbnail_label=QLabel()
-        self._thumbnails=QPixmap(self.program_location("Vinyl-Cover.png"))
-        self._thumbnail_label.setPixmap(self._thumbnails)
+        self._thumbnail_label.setScaledContents(True)
+        self._thumbnail_label.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Expanding)
+        self.cover=QPixmap(self.program_location("Vinyl-Cover.png"))
+        self._thumbnail_label.setPixmap(self.cover)
         self._thumbnail.thumbnail_changed.connect(self.update_thumbnail)
+        self.cover_color=QColor()
+        self._thumbnail_label.setMinimumSize(100,100)
         thumbnail_layout=QHBoxLayout()
         thumbnail_layout.addStretch()
         thumbnail_layout.addWidget(self._thumbnail_label)
         thumbnail_layout.addStretch()
-        
-        vertical_layout.addLayout(thumbnail_layout)
+
+        vertical_layout.addLayout(thumbnail_layout,6)
          
-        self.time_layout=QHBoxLayout()
+        self.visualizer = time_design(self.cover_color, 0, 0)
+        vertical_layout.addWidget(self.visualizer)
         
+        self.time_layout=QHBoxLayout()
         self.time_slider=QSlider(Qt.Horizontal)
         self.current_time_label=QLabel()
         self.current_time_label.setText("00:00")
@@ -89,7 +143,7 @@ class MainWindow():
         self.time_layout.addWidget(self.time_slider)
         self.time_layout.addWidget(self.total_time_label)
         
-        vertical_layout.addLayout(self.time_layout)
+        vertical_layout.addLayout(self.time_layout,1)
         
         self._song_timer=QTimer()
         self._song_timer.timeout.connect(self.update_timeline)
@@ -101,7 +155,7 @@ class MainWindow():
         self.volume_slider.setValue(50)
         self.volume_slider.valueChanged.connect(self._player.set_volume)
         volume_layout=QHBoxLayout()
-        volume_layout.addWidget(self.volume_slider)
+        volume_layout.addWidget(self.volume_slider,1)
         
         self.shortcut_volume_up = QShortcut(QKeySequence("Up"), self._window)
         self.shortcut_volume_up.activated.connect(self.volume_up)
@@ -109,7 +163,7 @@ class MainWindow():
         self.shortcut_volume_up = QShortcut(QKeySequence("Down"), self._window)
         self.shortcut_volume_up.activated.connect(self.volume_down)
         
-        vertical_layout.addLayout(volume_layout)
+        vertical_layout.addLayout(volume_layout,1)
         
         controllers_layout=QHBoxLayout()
         
@@ -152,7 +206,7 @@ class MainWindow():
         
         controllers_layout.addWidget(self.shuffle_button)
                 
-        vertical_layout.addLayout(controllers_layout)
+        vertical_layout.addLayout(controllers_layout,1)
         
         
 
@@ -202,12 +256,16 @@ class MainWindow():
 
 
     def update_thumbnail(self,data):
-        cover=QPixmap()
-        cover.loadFromData(data)
-        if cover.isNull():
-            cover=QPixmap(self.program_location("Vinyl-Cover.png"))
-        self._thumbnail_label.setPixmap(cover)
-
+        self.cover=QPixmap()
+        self.cover.loadFromData(data)
+        if self.cover.isNull():
+                   self.cover=QPixmap(self.program_location("Vinyl-Cover.png")) 
+        self._thumbnail_label.setPixmap(self.cover)
+        cover_scaled=self.cover.toImage()
+        cover_scaled=cover_scaled.scaled(1,1)
+        self.cover_color=cover_scaled.pixelColor(0,0)
+        self.visualizer.cover_color=self.cover_color
+        self.visualizer.update()
    
     def next_song_play(self):
         self._queue.next_or_previous("next")
@@ -223,10 +281,12 @@ class MainWindow():
             ico_pause_play=QIcon(self.program_location("Pause.png"))
             self.pause.setIcon(ico_pause_play)
             self._song_timer.start(300)
+            self.visualizer.bars_height_timer.start(50)
         else:
             ico_pause_play=QIcon(self.program_location("Play.png"))
             self.pause.setIcon(ico_pause_play)
             self._song_timer.stop()
+            self.visualizer.bars_height_timer.stop()
 
     
     def update_timeline(self):
@@ -235,6 +295,9 @@ class MainWindow():
             
             self.time_slider.setMaximum(duration)
             current_time=self._player.get_current_time()
+            
+            self.visualizer.song_duration = duration
+            self.visualizer.song_current_time = current_time
             if not self.time_slider.isSliderDown():
                 self.time_slider.setValue(current_time)
             current_time_mins=(current_time//1000)//60

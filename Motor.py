@@ -33,10 +33,10 @@ def song_data(song_id):
         return formatted_song
 
 def song_link_data(song_link_id):
-    raw_song_link=searcher.search(song_link_id)
+    raw_song_link=searcher.get_song(song_link_id)
     if raw_song_link:
         try:
-            formatted_song=music_data(raw_song_link[0])
+            formatted_song=music_data(raw_song_link)
             return formatted_song
         except Exception as e:
             error_message = str(e)
@@ -47,15 +47,27 @@ def song_link_data(song_link_id):
 
 def music_data(raw_song):
     if raw_song:
-        song={
-            "status":"success",
-            "title": raw_song["title"],
-            "id": raw_song["videoId"],
-            "duration": raw_song["duration_seconds"],
-            "thumbnails": raw_song["thumbnails"],
-            "artists": raw_song["artists"]
-        }
-        return song
+        if "videoDetails" in raw_song:
+            videoDetails=raw_song["videoDetails"]
+            song={
+                "status":"success",
+                "title": videoDetails["title"],
+                "id": videoDetails["videoId"],
+                "duration": int(videoDetails["lengthSeconds"]),
+                "thumbnails": videoDetails["thumbnail"]["thumbnails"],
+                "artists": videoDetails["author"]
+                }
+            return song
+        else:
+            song={
+                "status":"success",
+                "title": raw_song["title"],
+                "id": raw_song["videoId"],
+                "duration": raw_song["duration_seconds"],
+                "thumbnails": raw_song["thumbnails"],
+                "artists": raw_song["artists"]
+            }
+            return song
     else:
         song={
             "status":"error",
@@ -72,10 +84,10 @@ def search_bar(user_input):
         result=None
         parsed_url=urllib.parse.urlparse(user_input)
         params=urllib.parse.parse_qs(parsed_url.query)
-        if "list" in params:
-            result=playlist_data(params["list"][0])
-        elif "v" in params:
+        if "v" in params:
             result=song_link_data(params["v"][0])
+        elif "list" in params:
+            result=playlist_data(params["list"][0])
         else:
             result=song_data(user_input)
     else:
