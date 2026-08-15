@@ -4,7 +4,7 @@ import sys,urllib.request
 import Player
 import Motor
 import Queue
-from PySide6.QtCore import Qt,QPoint,QObject,Signal,QTimer
+from PySide6.QtCore import Qt,QPoint,QObject,Signal,QTimer,QPointF
 import threading
 import os
 import random
@@ -36,28 +36,38 @@ class ThumbnailFetcher(QObject):
             
 class time_design(QWidget):
     
+    time_changed=Signal(int)
+    
     def __init__(self,cover_color,song_duration,song_current_time):
         super().__init__()
         self.bars_number=0
-        self.bars_height=[random.uniform(0.1,0.9) for i  in range(50) ]
+        self.bars_height=[0 for i  in range(140) ]
         self.bars_height_timer=QTimer()
-        self.bars_height_timer.timeout.connect(self.update_heights)        
+        self.bars_height_timer.timeout.connect(self.update_heights)
         self.bar_gap=0
         self.bars_wave=0.0
         self.song_duration=0
         self.song_current_time=0
         self.cover_color=cover_color
+        self.cover_color_contrary=cover_color
         self.is_dragging=False
+        self.setMinimumHeight(50)
     
     def update_heights(self):
-        self.bars_height=[random.uniform(0.1,0.9) for i  in range(50) ]
+        self.bars_height=[random.uniform(0.1,0.9) for i  in range(140) ]
         self.update()
     
     
     def paintEvent(self,event):
         visaulizer=QPainter(self)
         visaulizer.setRenderHint(QPainter.RenderHint.Antialiasing)
-        if self.width() > 200:
+        if self.width() >= 800:
+            self.bars_number=140
+            self.bar_gap=2
+        elif self.width() >= 400:
+            self.bars_number=70
+            self.bar_gap=2
+        elif self.width() >= 200:
             self.bars_number=50
             self.bar_gap=2
         else:
@@ -71,14 +81,54 @@ class time_design(QWidget):
         for i in range(self.bars_number):
             position_x=i*(bar_width+self.bar_gap)
             bar_pixel_height=self.height() * self.bars_height[i]
-            position_y=(self.height()-(bar_pixel_height))/2
+            position_y=self.height()-(bar_pixel_height)
             if self.bars_number_color >= i:
+                visaulizer.setPen(Qt.PenStyle.NoPen)
                 visaulizer.setBrush(self.cover_color)
             else:
                 cover_color_alpha=QColor(self.cover_color)
                 cover_color_alpha.setAlpha(75)
+                visaulizer.setPen(Qt.PenStyle.NoPen)
                 visaulizer.setBrush(cover_color_alpha)
             visaulizer.drawRect(position_x,position_y,bar_width,bar_pixel_height)
+        if self.song_duration >0:
+            round_slider_x=self.width()*(self.song_current_time/self.song_duration)
+        else:
+            round_slider_x=0
+        round_slider_y=self.height()-6
+        visaulizer.setPen(Qt.PenStyle.NoPen)
+        
+        visaulizer.setBrush(self.cover_color_contrary)
+        visaulizer.drawEllipse(QPointF(round_slider_x,round_slider_y),6,6)
+    
+    def mousePressEvent(self, event):
+        self.is_dragging=True
+        click_x=event.position().x()
+        round_slider_percent=click_x/self.width()
+        round_slider_new_time=int(round_slider_percent*self.song_duration)
+        self.song_current_time=round_slider_new_time
+        self.update()
+        return super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        round_slider_new_time=0
+        if self.is_dragging==True:
+            if event.position().x() > 0 and event.position().x() < self.width():
+                click_x=event.position().x()
+            else:
+                click_x=max(0,min(event.position().x(),self.width()))
+            round_slider_percent=click_x/self.width()
+            round_slider_new_time=int(round_slider_percent*self.song_duration)
+            self.song_current_time=round_slider_new_time
+            self.update()
+        return super().mouseMoveEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        self.is_dragging=False
+        
+        self.time_changed.emit(self.song_current_time)
+        return super().mouseReleaseEvent(event)
+
 
                 
 class MainWindow():
@@ -129,25 +179,27 @@ class MainWindow():
         thumbnail_layout.addStretch()
 
         vertical_layout.addLayout(thumbnail_layout,6)
-         
+        
+        self.current_time_label=QLabel("00:00")
+        
         self.visualizer = time_design(self.cover_color, 0, 0)
-        vertical_layout.addWidget(self.visualizer)
         
-        self.time_layout=QHBoxLayout()
-        self.time_slider=QSlider(Qt.Horizontal)
-        self.current_time_label=QLabel()
-        self.current_time_label.setText("00:00")
-        self.total_time_label=QLabel()
-        self.total_time_label.setText("00:00")
-        self.time_layout.addWidget(self.current_time_label)
-        self.time_layout.addWidget(self.time_slider)
-        self.time_layout.addWidget(self.total_time_label)
+        self.total_time_label=QLabel("00:00")
+        self.current_time_label = QLabel("00:00")
+        self.total_time_label = QLabel("00:00")
+
+        time_layout=QHBoxLayout()
         
-        vertical_layout.addLayout(self.time_layout,1)
+        time_layout.addWidget(self.current_time_label,0)
+        time_layout.addWidget(self.visualizer,1)
+        time_layout.addWidget(self.total_time_label,0)
+        vertical_layout.addLayout(time_layout)
+        self.visualizer.time_changed.connect(self.update_current_time_new_slider)
         
+
+
         self._song_timer=QTimer()
         self._song_timer.timeout.connect(self.update_timeline)
-        self.time_slider.sliderReleased.connect(self.update_current_time)
         
         self.volume_slider=QSlider(Qt.Horizontal)
         self.volume_slider.setMaximum(100)
@@ -160,8 +212,8 @@ class MainWindow():
         self.shortcut_volume_up = QShortcut(QKeySequence("Up"), self._window)
         self.shortcut_volume_up.activated.connect(self.volume_up)
         
-        self.shortcut_volume_up = QShortcut(QKeySequence("Down"), self._window)
-        self.shortcut_volume_up.activated.connect(self.volume_down)
+        self.shortcut_volume_down = QShortcut(QKeySequence("Down"), self._window)
+        self.shortcut_volume_down.activated.connect(self.volume_down)
         
         vertical_layout.addLayout(volume_layout,1)
         
@@ -265,6 +317,9 @@ class MainWindow():
         cover_scaled=cover_scaled.scaled(1,1)
         self.cover_color=cover_scaled.pixelColor(0,0)
         self.visualizer.cover_color=self.cover_color
+        h,s,v,a=self.cover_color.getHsv()
+        h=(h+180)%360
+        self.visualizer.cover_color_contrary=QColor.fromHsv(h,s,v,a)
         self.visualizer.update()
    
     def next_song_play(self):
@@ -293,28 +348,28 @@ class MainWindow():
         duration=self._player.get_length();
         if duration >0:
             
-            self.time_slider.setMaximum(duration)
             current_time=self._player.get_current_time()
             
             self.visualizer.song_duration = duration
-            self.visualizer.song_current_time = current_time
-            if not self.time_slider.isSliderDown():
-                self.time_slider.setValue(current_time)
+            if not self.visualizer.is_dragging:
+                self.visualizer.song_current_time = current_time
+                self.visualizer.update()
+                
             current_time_mins=(current_time//1000)//60
             current_time_seconds=(current_time//1000)%60
             
             formated_time=f"{current_time_mins:02d}:{current_time_seconds:02d}"
+            
             self.current_time_label.setText(formated_time)
             
             total_time_mins=(duration//1000)//60
             total_time_seconds=(duration//1000)%60
             formated_total_time=f"{total_time_mins:02d}:{total_time_seconds:02d}"
             self.total_time_label.setText(formated_total_time)
-        else:
-            self.time_slider.setMaximum(0)
 
-    def update_current_time(self):
-        self._player.set_actual_time(self.time_slider.value())
+            
+    def update_current_time_new_slider(self,new_time):
+        self._player.set_actual_time(new_time)
         
     def shuffle(self):
         self._queue.shuffle_queue()
