@@ -25,12 +25,16 @@ def playlist_data(playlist_id):
 
 def song_data(song_id):
     raw_song=searcher.search(song_id,filter="songs")
+    list_song=[]
     if raw_song:
-        formatted_song=music_data(raw_song[0])
-        return formatted_song
+        for i in raw_song[:5]:         
+            formatted_song=music_data(i)
+            list_song.append(formatted_song)
+        return list_song
     else:
         formatted_song=music_data(None)
-        return formatted_song
+        list_song.append(formatted_song)
+        return list_song
 
 def song_link_data(song_link_id):
     raw_song_link=searcher.get_song(song_link_id)
