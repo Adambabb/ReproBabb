@@ -120,7 +120,7 @@ class volume_design(QWidget):
         self.volume_slider.setValue(50)
         self.volume_slider.setVisible(False)
         self.volume_slider.valueChanged.connect(self.volume_changed.emit)
-        
+        self.color=0
         self.shortcut_volume_up = QShortcut(QKeySequence("Up"), self)
         self.shortcut_volume_up.activated.connect(self.volume_up)
         
@@ -141,3 +141,26 @@ class volume_design(QWidget):
 
     def volume_down(self):
             self.volume_slider.setValue(self.volume_slider.value()-10)
+    
+    def color_slider(self,color):
+        self.color=color
+        hex_color=self.color.name()
+        
+        self.volume_slider.setStyleSheet(f"""
+        QSlider::groove:horizontal {{
+            height: 6px;
+            background: #444444;
+            border-radius: 3px;
+        }}
+        QSlider::sub-page:horizontal {{
+            background: {hex_color};
+            border-radius: 3px;
+        }}
+        QSlider::handle:horizontal {{
+            background: {hex_color};
+            width: 12px;
+            margin-top: -3px;
+            margin-bottom: -3px;
+            border-radius: 6px;
+        }}
+    """)

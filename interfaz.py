@@ -38,11 +38,13 @@ class MainWindow(QObject):
         self._search_timer.timeout.connect(self.click_search)
         self._search_timer.setSingleShot(True)
         self._search_box.textChanged.connect(lambda text: self._search_timer.start(300))
-        self._search_box.returnPressed.connect(self.click_search)
+        self._search_box.returnPressed.connect(self.on_search_enter)
         self.search_finished.connect(self.search_result)
         
         self.search_list=QListWidget(self._window)
         self.search_list.setVisible(False)
+        self.search_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.search_list.customContextMenuRequested.connect(self.context_menu)
         self.search_list.itemClicked.connect(self.select_song)
         
         search_button=QPushButton("search")
@@ -96,7 +98,6 @@ class MainWindow(QObject):
 
         self.volume_slider=CustomWidgets.volume_design(self.program_location("Volume.png"))
         vertical_layout.addWidget(self.volume_slider,1)
-
         self.volume_slider.volume_changed.connect(self._player.set_volume)
         
         
@@ -192,18 +193,26 @@ class MainWindow(QObject):
                     search_list_element.setData(Qt.UserRole,song)
                     self.search_list.addItem(search_list_element)
             if self.search_list.count() > 0:
-                self.search_list.raise_()
                 self.search_list.setVisible(True)
             else:
                 self.search_list.setVisible(False)
         self.shuffle_button.setChecked(False)
         
+    def on_search_enter(self):
+        self._search_timer.stop()
+        self.click_search()
+        self._search_box.clearFocus()
+        self._window.setFocus()
+        self._search_box.clear()
+
+        
     def select_song(self,item):
         song=item.data(Qt.UserRole)
-        
+        self._search_box.clearFocus()
         self._queue.playing_playlist([song])
         self.search_list.setVisible(False)
         self._search_box.clear()
+        self._window.setFocus()
         
     def settings_menu(self):
         self.settings.exec(self._window.mapToGlobal(QPoint(self._window.width()//2-self.settings.sizeHint().width()//2,self._window.height()//2-self.settings.sizeHint().height()//2)))
@@ -227,7 +236,9 @@ class MainWindow(QObject):
         h,s,v,a=self.cover_color.getHsv()
         h=(h+180)%360
         self.visualizer.cover_color_contrary=QColor.fromHsv(h,s,v,a)
+        self.volume_slider.color_slider(self.visualizer.cover_color_contrary)
         self.visualizer.update()
+        
     
     def list_thumbnals(self,image,id):
         list_image=QPixmap()
@@ -292,9 +303,17 @@ class MainWindow(QObject):
         
     def shuffle(self):
         self._queue.shuffle_queue()
-        
-
     
+    def context_menu(self,pos):
+        selected_song=self.search_list.itemAt(pos)
+        if selected_song:
+            song_data=selected_song.data(Qt.UserRole)
+            menu=QMenu()
+            play_next_action=menu.addAction("Play Next")
+            play_next_action.triggered.connect(lambda :(self._queue.add_to_queue(song_data),self.search_list.hide()))
+            menu_pos=self.search_list.mapToGlobal(pos)
+            menu.exec(menu_pos)
+            
 start=MainWindow()
 close=start._app.exec()
 

@@ -144,3 +144,18 @@ class SongQueue(QObject):
                 self._current_index=len(self._songs_list)
         else:
             self._current_index+=1
+     
+    def add_to_queue(self,song):
+        with self._lock:
+            insert_index=0
+            if self._is_shuffle:
+                insert_index=self._shuffle_current_index+1
+                self._songs_list.append(song)
+                new_song_index=len(self._songs_list)-1
+                self._shuffle_song_list.insert(insert_index,new_song_index)
+            else:
+                insert_index=self._current_index+1
+                self._songs_list.insert(insert_index,song)
+
+                
+        
