@@ -4,7 +4,34 @@ import urllib.parse
 
 searcher = ytmusicapi.YTMusic()
 
-      
+
+
+def set_account(file_path):
+    global searcher
+    try:
+        if file_path:
+            searcher=ytmusicapi.YTMusic(file_path)
+            return True
+    except Exception as e:
+        print("Error: ",  e)
+        searcher= ytmusicapi.YTMusic()
+        return False
+
+def get_user_playlist():
+    user_playlist=searcher.get_library_playlists()
+    playlist_fetched=[]
+    if user_playlist:
+        for playlist in user_playlist:
+            playlist_data={
+                "title":playlist.get("title",""),
+                "playlistId":playlist.get("playlistId",""),
+                "thumbnails":playlist.get("thumbnails",[])
+                }
+            playlist_fetched.append(playlist_data)
+    return playlist_fetched
+    
+
+    
 def playlist_data(playlist_id):
     raw_playlist=searcher.get_playlist(playlist_id,limit=None)
     song_list=[]
@@ -97,12 +124,15 @@ def search_bar(user_input):
     else:
         result=song_data(user_input)
     return result
-    
-fetcher_options={
-        "format":"bestaudio",
-        "noplaylist":True,
-        "quiet":False,
+fetcher_options = {
+    'format': 'bestaudio/best',
+    'quiet': True,
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'ios']
+        }
     }
+}
     
 def fetch(video_id):
     with yt_dlp.YoutubeDL(fetcher_options) as fetcher:

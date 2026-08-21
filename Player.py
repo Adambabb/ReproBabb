@@ -23,7 +23,8 @@ class AudioController(QObject):
         self._status = "idle"
         self._has_played=False
         self._volume=50
-        self.player = vlc.MediaPlayer()
+        self._instance = vlc.Instance('--no-video', '--quiet')  
+        self.player = self._instance.media_player_new()      
         self._event_manager = self.player.event_manager()
         for event in events:
             self._event_manager.event_attach(event,self._on_vlc_event)
@@ -66,7 +67,7 @@ class AudioController(QObject):
             
     def play(self, url: str):
         self._has_played=False
-        media=vlc.Media(url)
+        media = self._instance.media_new(url)
         self.player.set_media(media)
         self.player.play()
             

@@ -9,6 +9,8 @@ class ThumbnailFetcher(QObject):
     
     list_thumbnail_changed=Signal(bytes,str)
     
+    playlist_thumbnail_changed=Signal(bytes,str)
+    
     def __init__(self, queue):
             super().__init__()
             self._queue = queue
@@ -44,3 +46,18 @@ class ThumbnailFetcher(QObject):
                 self.list_thumbnail_changed.emit(data,song["id"])
         except Exception as e:
             print("Error fetching thumbnail:", e)
+            
+    def download_playlist_thumbnail(self,playlist):
+        if playlist.get("thumbnails"):
+            get_thumbnail=threading.Thread(target=self.playlist_thumbnail,daemon=True,args=(playlist,))
+            get_thumbnail.start()
+    
+    def playlist_thumbnail(self,playlist):
+            try:
+                url=playlist["thumbnails"][-1]["url"]
+                url = url.replace("=w60-h60", "=w80-h80").replace("=w120-h120", "=w80-h80")
+                with urllib.request.urlopen(url) as response:
+                    data=response.read()
+                    self.playlist_thumbnail_changed.emit(data,playlist["playlistId"])
+            except Exception as e:
+                print("Error fetching thumbnail:", e)
