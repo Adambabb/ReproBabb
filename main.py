@@ -1,0 +1,194 @@
+from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout,QTabWidget,QMessageBox
+from PySide6.QtGui import QIcon, QPixmap
+import PlayerTab,LibraryTab,Network,Motor,Queue,Player,sys
+from PySide6.QtCore import Qt,QTimer,Qt,Signal,QObject,QSettings
+import threading
+import os
+
+                
+class MainWindow(QObject):
+    fetched_playlist=Signal(bool,list)
+    search_completed=Signal(object)
+    def __init__(self):
+        super().__init__()
+        self.app=QApplication([])
+        self.window=QWidget()
+        self.window.setWindowTitle("ReproBabb")
+        self.window.setMaximumSize(300,400)
+        self.window.setWindowIcon(QIcon(os.path.join(os.path.dirname(__file__),"Assets","Reprobabb.png")))
+        self.settings=QSettings("Reprobabb","Reprobabb")
+        self.tab=QTabWidget()
+        self.song_timer=QTimer()
+        self.song_timer.timeout.connect(self.update_timeline)
+        
+        self.search_completed.connect(self.on_search_completed)
+        self.fetched_playlist.connect(self.on_playlist_fetched)
+        
+        self.always_on_toggle(True)
+        
+        self.player_tab=PlayerTab.PlayerTab()
+        self.visualizer=self.player_tab.visualizer
+        self.volume_slider=self.player_tab.volume_slider
+        self.library_tab=LibraryTab.LibraryTab()
+        self.player=Player.AudioController()
+        self.queue=Queue.SongQueue(self.player)        
+        self.thumbnail=Network.ThumbnailFetcher(self.queue)
+        
+        #===============================Connections========================================#
+        self.player_tab.play_pause_toggled.connect(self.toggle_play_pause)
+        self.player_tab.next_requested.connect(self.next_song_play)
+        self.player_tab.previous_requested.connect(self.previous_song_play)
+        self.player_tab.time_changed.connect(self.update_current_time_new_slider)
+        self.player_tab.volume_changed.connect(self.player.set_volume)
+        self.player_tab.shuffle_requested.connect(self.queue.shuffle_queue)
+        self.player_tab.play_requested.connect(self.queue.playing_playlist)
+        self.player_tab.play_next_requested.connect(self.queue.add_to_queue)
+        self.player_tab.search_requested.connect(self.search)
+        
+        self.player_tab.always_on_toggle.connect(self.always_on_toggle)
+        self.tab.addTab(self.player_tab,"Reproducer")
+        
+        self.library_tab.load_account_requested.connect(self.select_load_account)
+        self.library_tab.playlist_content_selected.connect(self.select_user_playlist)
+        self.library_tab.playlist_play_requested.connect(self.queue.playing_playlist)
+        self.tab.addTab(self.library_tab,"Library")
+  
+        self.player.error_occurred.connect(self.player_tab.show_error)
+        self.player.state_changed.connect(self.update_play_icon)
+
+        
+        self.thumbnail.thumbnail_changed.connect(self.player_tab.update_thumbnail)
+        self.thumbnail.list_thumbnail_changed.connect(self.list_thumbnails)
+        self.thumbnail.playlist_thumbnail_changed.connect(self.list_thumbnails)
+
+
+        self.general_vlayout=QVBoxLayout()
+        self.general_vlayout.addWidget(self.tab)
+        self.window.setLayout(self.general_vlayout)
+        self.try_auto_login()
+        self.app.aboutToQuit.connect(lambda: self.thumbnail.download_list_thumbnail_executor.shutdown(wait=False, cancel_futures=True))
+        self.window.show()
+
+    def search(self,search,search_ver):
+        
+        search_playlist_thread=threading.Thread(target=self.search_process,daemon=True,args=(search,search_ver))
+        search_playlist_thread.start()
+     
+    #before emit the res we check tahta there isn't any new search comparing if the search version is diferent       
+    def search_process(self,search,search_version):
+        res=Motor.search_bar(search)
+        if search_version == self.player_tab.search_version:
+            self.search_completed.emit(res)
+
+    def always_on_toggle(self,display):
+        self.window.setWindowFlag(Qt.WindowStaysOnTopHint, display)
+        self.window.show()
+
+        
+    
+    def list_thumbnails(self,image,id):
+        lists=(self.player_tab.search_list,self.library_tab.user_playlists_songs,self.library_tab.user_playlists)
+        list_image=QPixmap()
+        list_image.loadFromData(image)
+        list_icon=QIcon(list_image)
+        
+        for widget_list in lists :
+            for i in range (widget_list.count()):
+                item = widget_list.item(i)
+                song_data = item.data(Qt.UserRole)
+                if song_data and (song_data.get("id") == id or song_data.get("playlistId")==id):
+                    item.setIcon(list_icon)
+                    break
+            
+    
+    def next_song_play(self):
+        self.queue.next_or_previous("next")
+    
+    def previous_song_play(self):
+        self.queue.next_or_previous("previous")
+
+    def toggle_play_pause(self):
+        self.player.toggle_pause_play()
+
+    def update_play_icon(self,state):
+        if state=="Playing":
+            self.song_timer.start(300)
+            self.tab.setCurrentIndex(0)
+        else:
+            self.song_timer.stop()
+        self.player_tab.update_play_icon(state)
+
+    
+    def update_timeline(self):
+        duration=self.player.get_length();
+        current_time=0
+        if duration >0:
+            
+            current_time=self.player.get_current_time()
+
+            self.player_tab.update_timeline(current_time,duration)
+
+            
+    def update_current_time_new_slider(self,new_time):
+        self.player.set_actual_time(new_time)
+        
+    def shuffle(self):
+        self.queue.shuffle_queue()
+
+            
+    def select_load_account(self,file_path,show_error):
+        playlists=[]
+        succes=False
+        if file_path:
+            sesion=Motor.set_account(file_path)
+            if sesion:
+                self.settings.setValue("saved_session_path",file_path)
+                succes=True           
+                playlists=Motor.get_user_playlist()
+                for playlist in playlists:
+                    self.thumbnail.download_playlist_thumbnail(playlist)
+            else:
+                if show_error:
+                    QMessageBox.critical(
+                    self.window,
+                    "Sesion Error",
+                    "Couldn't sign up, wrong file or expired credentials in the file "
+                )
+        self.library_tab.display_playlists(playlists,file_path,succes)
+    
+    def try_auto_login(self):
+        saved_path=self.settings.value("saved_session_path","")
+        if saved_path and os.path.exists(saved_path):
+            self.select_load_account(saved_path,False)
+        
+    def select_user_playlist(self,playlist):
+        playlist_id=playlist["playlistId"]
+        search_playlist_thread=threading.Thread(target=self.get_user_playlist_data,daemon=True,args=(playlist_id,))
+        search_playlist_thread.start()
+        
+    
+    def get_user_playlist_data(self,playlist_id):
+        playlist_data=Motor.playlist_data(playlist_id)
+        if playlist_data and playlist_data[0]["status"]=="success":
+                        self.fetched_playlist.emit(True,playlist_data)
+        else:
+            playlist_data=[]
+            self.fetched_playlist.emit(False,playlist_data)
+        
+    def on_playlist_fetched(self,playlist_status,playlist_data):
+        if playlist_status:
+            self.library_tab.display_playlist_songs(playlist_status,playlist_data)
+            for song in playlist_data:
+                self.thumbnail.download_list_thumbnail(song)
+
+    def on_search_completed(self, res):
+        self.player_tab.search_result(res)
+        songs = res if isinstance(res, list) else [res]
+        for song in songs:
+            if isinstance(song, dict) and song.get("status") == "success":
+                self.thumbnail.download_list_thumbnail(song)           
+
+start=MainWindow()
+close=start.app.exec()
+
+sys.exit(close)

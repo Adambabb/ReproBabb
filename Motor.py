@@ -12,6 +12,8 @@ def set_account(file_path):
         if file_path:
             searcher=ytmusicapi.YTMusic(file_path)
             return True
+        else:
+            return False
     except Exception as e:
         print("Error: ",  e)
         searcher= ytmusicapi.YTMusic()
@@ -82,21 +84,21 @@ def music_data(raw_song):
             videoDetails=raw_song["videoDetails"]
             song={
                 "status":"success",
-                "title": videoDetails["title"],
-                "id": videoDetails["videoId"],
-                "duration": int(videoDetails["lengthSeconds"]),
-                "thumbnails": videoDetails["thumbnail"]["thumbnails"],
-                "artists": videoDetails["author"]
+                "title": videoDetails.get("title",""),
+                "id": videoDetails.get("videoId",""),
+                "duration": int(videoDetails.get("lengthSeconds",0)),
+                "thumbnails": videoDetails.get("thumbnail", {}).get("thumbnails", []),
+                "artists": videoDetails.get("author","")
                 }
             return song
         else:
             song={
                 "status":"success",
-                "title": raw_song["title"],
-                "id": raw_song["videoId"],
-                "duration": raw_song["duration_seconds"],
-                "thumbnails": raw_song["thumbnails"],
-                "artists": raw_song["artists"]
+                "title": raw_song.get("title",""),
+                "id": raw_song.get("videoId",""),
+                "duration": int(raw_song.get("duration_seconds",0)),
+                "thumbnails": raw_song.get("thumbnails",[]),
+                "artists": raw_song.get("artists","")
             }
             return song
     else:

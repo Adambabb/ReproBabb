@@ -5,7 +5,7 @@ from PySide6.QtGui import QPainter,QColor,QShortcut,QKeySequence,QPixmap
 import random
 
             
-class time_design(QWidget):
+class TimeDesign(QWidget):
     
     time_changed=Signal(int)
     
@@ -16,7 +16,6 @@ class time_design(QWidget):
         self.bars_height_timer=QTimer()
         self.bars_height_timer.timeout.connect(self.update_heights)
         self.bar_gap=0
-        self.bars_wave=0.0
         self.song_duration=0
         self.song_current_time=0
         self.cover_color=cover_color
@@ -30,8 +29,8 @@ class time_design(QWidget):
     
     
     def paintEvent(self,event):
-        visaulizer=QPainter(self)
-        visaulizer.setRenderHint(QPainter.RenderHint.Antialiasing)
+        visualizer=QPainter(self)
+        visualizer.setRenderHint(QPainter.RenderHint.Antialiasing)
         if self.width() >= 800:
             self.bars_number=140
             self.bar_gap=2
@@ -54,23 +53,23 @@ class time_design(QWidget):
             bar_pixel_height=self.height() * self.bars_height[i]
             position_y=self.height()-(bar_pixel_height)
             if self.bars_number_color >= i:
-                visaulizer.setPen(Qt.PenStyle.NoPen)
-                visaulizer.setBrush(self.cover_color)
+                visualizer.setPen(Qt.PenStyle.NoPen)
+                visualizer.setBrush(self.cover_color)
             else:
                 cover_color_alpha=QColor(self.cover_color)
                 cover_color_alpha.setAlpha(75)
-                visaulizer.setPen(Qt.PenStyle.NoPen)
-                visaulizer.setBrush(cover_color_alpha)
-            visaulizer.drawRect(position_x,position_y,bar_width,bar_pixel_height)
+                visualizer.setPen(Qt.PenStyle.NoPen)
+                visualizer.setBrush(cover_color_alpha)
+            visualizer.drawRect(position_x,position_y,bar_width,bar_pixel_height)
         if self.song_duration >0:
             round_slider_x=self.width()*(self.song_current_time/self.song_duration)
         else:
             round_slider_x=0
         round_slider_y=self.height()-6
-        visaulizer.setPen(Qt.PenStyle.NoPen)
+        visualizer.setPen(Qt.PenStyle.NoPen)
         
-        visaulizer.setBrush(self.cover_color_contrary)
-        visaulizer.drawEllipse(QPointF(round_slider_x,round_slider_y),6,6)
+        visualizer.setBrush(self.cover_color_contrary)
+        visualizer.drawEllipse(QPointF(round_slider_x,round_slider_y),6,6)
     
     def mousePressEvent(self, event):
         self.is_dragging=True
@@ -100,7 +99,7 @@ class time_design(QWidget):
         self.time_changed.emit(self.song_current_time)
         return super().mouseReleaseEvent(event)
 
-class volume_design(QWidget):
+class VolumeDesign(QWidget):
     
     volume_changed=Signal(int)
     
@@ -120,7 +119,7 @@ class volume_design(QWidget):
         self.volume_slider.setValue(50)
         self.volume_slider.setVisible(False)
         self.volume_slider.valueChanged.connect(self.volume_changed.emit)
-        self.color=0
+        self.color=QColor()
         self.shortcut_volume_up = QShortcut(QKeySequence("Up"), self)
         self.shortcut_volume_up.activated.connect(self.volume_up)
         

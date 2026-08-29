@@ -1,6 +1,7 @@
 from PySide6.QtCore import QObject,Signal
 import urllib.request
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 
 class ThumbnailFetcher(QObject):
@@ -15,6 +16,7 @@ class ThumbnailFetcher(QObject):
             super().__init__()
             self._queue = queue
             self._queue.song_data.connect(self.download_thumbnail)
+            self.download_list_thumbnail_executor=ThreadPoolExecutor(max_workers=5)
 
     
     def download_thumbnail(self,song):
@@ -26,22 +28,21 @@ class ThumbnailFetcher(QObject):
     def fetch_thumbnail(self,url):
         try:
             url = url.replace("=w60-h60", "=w400-h400").replace("=w120-h120", "=w400-h400")
-            with urllib.request.urlopen(url) as response:
+            with urllib.request.urlopen(url, timeout=5) as response:
                 data=response.read()
                 self.thumbnail_changed.emit(data)
         except Exception as e:
             print("Error fetching thumbnail:", e)
-    
+            
     def download_list_thumbnail(self,song):
             if song.get("thumbnails"):
-                get_thumbnail=threading.Thread(target=self.list_thumbnail,daemon=True,args=(song,))
-                get_thumbnail.start()
+                self.download_list_thumbnail_executor.submit(self.list_thumbnail,song)
     
     def list_thumbnail(self,song):
         try:
             url=song["thumbnails"][-1]["url"]
             url = url.replace("=w60-h60", "=w40-h40").replace("=w120-h120", "=w40-h40")
-            with urllib.request.urlopen(url) as response:
+            with urllib.request.urlopen(url, timeout=5) as response:
                 data=response.read()
                 self.list_thumbnail_changed.emit(data,song["id"])
         except Exception as e:
@@ -56,8 +57,10 @@ class ThumbnailFetcher(QObject):
             try:
                 url=playlist["thumbnails"][-1]["url"]
                 url = url.replace("=w60-h60", "=w80-h80").replace("=w120-h120", "=w80-h80")
-                with urllib.request.urlopen(url) as response:
+                with urllib.request.urlopen(url, timeout=5) as response:
                     data=response.read()
                     self.playlist_thumbnail_changed.emit(data,playlist["playlistId"])
             except Exception as e:
                 print("Error fetching thumbnail:", e)
+    
+    
