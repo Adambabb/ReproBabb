@@ -15,6 +15,8 @@ class PlayerTab(QWidget):
     volume_changed = Signal(int)
     time_changed=Signal(int)
     always_on_toggle=Signal(bool)
+    added_playlist=Signal(str,dict)
+
     def __init__(self):
         super().__init__()
         self.location=os.path.dirname(__file__)
@@ -34,6 +36,7 @@ class PlayerTab(QWidget):
         
         self.search_list=QListWidget(self)
         self.search_list.setVisible(False)
+        self.available_playlists=[]
         self.search_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.search_list.customContextMenuRequested.connect(self.context_menu)
         self.search_list.itemClicked.connect(self.select_song)
@@ -139,7 +142,13 @@ class PlayerTab(QWidget):
         self.settings.addAction(self.visible)
         self.visible.toggled.connect(self.always_on_toggle.emit)
         
-        self.setLayout(vertical_layout)
+        self.general_layout=QHBoxLayout()
+        self.general_layout.addLayout(vertical_layout)
+        
+        self.vertical_queue_layout=QVBoxLayout()
+        self.general_layout.addLayout(self.vertical_queue_layout)
+        
+        self.setLayout(self.general_layout)
         
         
     def program_location(self,asset_name):
@@ -261,8 +270,16 @@ class PlayerTab(QWidget):
                 menu=QMenu()
                 play_next_action=menu.addAction("Play Next")
                 play_next_action.triggered.connect(lambda: (self.play_next_requested.emit(song_data), self.search_list.hide()))
+                add_song_playlist=menu.addMenu("Add to playlist")
+                for playlist in self.available_playlists:
+                    playlist_to_select=add_song_playlist.addAction(playlist["title"])
+                    playlist_to_select.triggered.connect(lambda checked=False, p=playlist["playlistId"], s=song_data: self.added_playlist.emit(p,s))                
                 menu_pos=self.search_list.mapToGlobal(pos)
                 menu.exec(menu_pos)
+                            
+    
+    def update_playlist(self,new_playlist):
+        self.available_playlists=new_playlist
     
     def update_current_time_new_slider(self,new_time):
            self.time_changed.emit(new_time)

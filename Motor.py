@@ -41,6 +41,7 @@ def playlist_data(playlist_id):
         tracks=raw_playlist["tracks"]
         for song in tracks:
             formatted_song=music_data(song)
+            formatted_song["setVideoId"]=song.get("setVideoId","")
             if formatted_song["status"]=="error":
                 continue
             song_list.append(formatted_song)
@@ -112,6 +113,33 @@ def music_data(raw_song):
         }
         return song
 
+def add_song_playlist(playlist_id,song_id,duplicates=True):
+    try:
+        song_id_list=[song_id]
+        searcher.add_playlist_items(playlist_id,song_id_list,duplicates=duplicates)
+        add_status={"status":"success"}
+        return add_status
+    except Exception as e:
+        error_message=str(e)
+        add_status={"error": error_message,
+                    "status":"error"}
+        return add_status
+
+def remove_song_playlist(playlist_id,formatted_song):
+    track={
+        "videoId":formatted_song.get("id",""),
+        "setVideoId":formatted_song.get("setVideoId","")
+    }
+    try:
+        searcher.remove_playlist_items(playlist_id,[track])
+        add_status={"status":"success"}
+        return add_status
+    except Exception as e:
+        error_message=str(e)
+        add_status={"error": error_message,
+                    "status":"error"}
+        return add_status
+    
 def search_bar(user_input):
     if "http" in user_input:
         result=None

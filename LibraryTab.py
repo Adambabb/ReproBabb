@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget,QHBoxLayout,QVBoxLayout,QLineEdit,QListWidget,QListWidgetItem,QPushButton,QLabel,QFileDialog
+from PySide6.QtWidgets import QWidget,QHBoxLayout,QVBoxLayout,QLineEdit,QListWidget,QListWidgetItem,QPushButton,QLabel,QFileDialog,QMenu
 from PySide6.QtCore import Signal,QSize,Qt
 import threading
 
@@ -8,6 +8,7 @@ class LibraryTab(QWidget):
     load_account_requested=Signal(str,bool)
     playlist_content_selected=Signal(dict)
     playlist_play_requested=Signal(list,int)
+    song_playlist_delete=Signal(str,dict)
     def __init__(self):
         super().__init__()
         self.playlists_songs=QHBoxLayout()
@@ -30,11 +31,15 @@ class LibraryTab(QWidget):
         self.user_playlists_songs=QListWidget()
         self.user_playlists_songs.setIconSize(QSize(40,40))
         self.user_playlists_songs.itemClicked.connect(self.play_playlist_song_at)
+        self.user_playlists_songs.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.user_playlists_songs.customContextMenuRequested.connect(self.playlist_context_menu)
         self.user_playlists.itemClicked.connect(self.select_user_playlist)
         self.playlists_songs.addWidget(self.user_playlists)
         self.playlists_songs.addWidget(self.user_playlists_songs)
         self.library_vlayout.addLayout(self.playlists_songs,1)
         self.setLayout(self.library_vlayout)
+        
+        self.current_playlist=None
     
     
     def select_load_account(self):
@@ -45,6 +50,7 @@ class LibraryTab(QWidget):
                     
     def select_user_playlist(self,item):
             playlist=item.data(Qt.UserRole)
+            self.current_playlist=playlist
             self.playlist_content_selected.emit(playlist)
     
     def play_playlist_song_at(self,item):
@@ -75,5 +81,13 @@ class LibraryTab(QWidget):
                     artists = ", ".join(artist['name'] for artist in song['artists']) if isinstance(song['artists'], list) else song['artists']
                     playlist_item=QListWidgetItem(f"{song['title']}-{artists}")
                     playlist_item.setData(Qt.UserRole,song)
-                    self.user_playlists_songs.addItem(playlist_item)       
-        
+                    self.user_playlists_songs.addItem(playlist_item)
+    
+    def playlist_context_menu(self,pos):
+        selected_song=self.user_playlists_songs.itemAt(pos)
+        if selected_song and self.current_playlist:
+            song_data=selected_song.data(Qt.UserRole)
+            menu=QMenu()
+            delete_action=menu.addAction("Remove from playlist")
+            delete_action.triggered.connect(lambda: self.song_playlist_delete.emit(self.current_playlist.get("playlistId",""),song_data))
+            menu.exec(self.user_playlists_songs.mapToGlobal(pos))

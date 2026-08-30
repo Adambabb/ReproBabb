@@ -44,6 +44,7 @@ class MainWindow(QObject):
         self.player_tab.play_requested.connect(self.queue.playing_playlist)
         self.player_tab.play_next_requested.connect(self.queue.add_to_queue)
         self.player_tab.search_requested.connect(self.search)
+        self.player_tab.added_playlist.connect(self.add_song_playlist)
         
         self.player_tab.always_on_toggle.connect(self.always_on_toggle)
         self.tab.addTab(self.player_tab,"Reproducer")
@@ -51,6 +52,7 @@ class MainWindow(QObject):
         self.library_tab.load_account_requested.connect(self.select_load_account)
         self.library_tab.playlist_content_selected.connect(self.select_user_playlist)
         self.library_tab.playlist_play_requested.connect(self.queue.playing_playlist)
+        self.library_tab.song_playlist_delete.connect(self.handle_remove_song)
         self.tab.addTab(self.library_tab,"Library")
   
         self.player.error_occurred.connect(self.player_tab.show_error)
@@ -145,6 +147,7 @@ class MainWindow(QObject):
                 self.settings.setValue("saved_session_path",file_path)
                 succes=True           
                 playlists=Motor.get_user_playlist()
+                self.player_tab.update_playlist(playlists)
                 for playlist in playlists:
                     self.thumbnail.download_playlist_thumbnail(playlist)
             else:
@@ -162,7 +165,7 @@ class MainWindow(QObject):
             self.select_load_account(saved_path,False)
         
     def select_user_playlist(self,playlist):
-        playlist_id=playlist["playlistId"]
+        playlist_id=playlist.get("playlistId","")
         search_playlist_thread=threading.Thread(target=self.get_user_playlist_data,daemon=True,args=(playlist_id,))
         search_playlist_thread.start()
         
@@ -186,7 +189,20 @@ class MainWindow(QObject):
         songs = res if isinstance(res, list) else [res]
         for song in songs:
             if isinstance(song, dict) and song.get("status") == "success":
-                self.thumbnail.download_list_thumbnail(song)           
+                self.thumbnail.download_list_thumbnail(song)
+    
+    def add_song_playlist(self,playlist_id,song_data):
+        add_song_thread=threading.Thread(target=Motor.add_song_playlist, daemon=True, args=(playlist_id,song_data.get("id","")))
+        add_song_thread.start()
+    
+    def handle_remove_song(self,playlist_id,song_data):
+        remove_thread=threading.Thread(target=self.remove_song,daemon=True,args=(playlist_id,song_data))
+        remove_thread.start()
+    
+    def remove_song(self,playlist_id,song_data):
+        remove_response=Motor.remove_song_playlist(playlist_id,song_data)
+        if remove_response["status"]=="success":
+            self.get_user_playlist_data(playlist_id)
 
 start=MainWindow()
 close=start.app.exec()
