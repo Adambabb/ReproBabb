@@ -54,6 +54,8 @@ def playlist_data(playlist_id):
         return song_list
 
 def song_data(song_id):
+    if not song_id or not song_id.strip():
+        return []
     raw_song=searcher.search(song_id,filter="songs")
     list_song=[]
     if raw_song:

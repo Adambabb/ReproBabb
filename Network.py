@@ -41,7 +41,7 @@ class ThumbnailFetcher(QObject):
     def list_thumbnail(self,song):
         try:
             url=song["thumbnails"][-1]["url"]
-            url = url.replace("=w60-h60", "=w40-h40").replace("=w120-h120", "=w40-h40")
+            url = url.replace("=w60-h60", "=w60-h60").replace("=w120-h120", "=w60-h60")
             with urllib.request.urlopen(url, timeout=5) as response:
                 data=response.read()
                 self.list_thumbnail_changed.emit(data,song["id"])

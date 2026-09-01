@@ -14,8 +14,11 @@ class MainWindow(QObject):
         self.app=QApplication([])
         self.window=QWidget()
         self.window.setWindowTitle("ReproBabb")
-        self.window.setMaximumSize(300,400)
+        #self.window.setMaximumSize(300,400)
         self.window.setWindowIcon(QIcon(os.path.join(os.path.dirname(__file__),"Assets","Reprobabb.png")))
+        styles_file=open(os.path.join(os.path.dirname(__file__),"Styles","styles.Qss"),"r")
+        with styles_file  as styles:
+            self.app.setStyleSheet(styles.read())
         self.settings=QSettings("Reprobabb","Reprobabb")
         self.tab=QTabWidget()
         self.song_timer=QTimer()
@@ -63,7 +66,10 @@ class MainWindow(QObject):
         self.thumbnail.list_thumbnail_changed.connect(self.list_thumbnails)
         self.thumbnail.playlist_thumbnail_changed.connect(self.list_thumbnails)
 
-
+        self.queue.song_data.connect(self.player_tab.update_title_artist)
+        self.queue.change_shuffle.connect(self.change_shuffle)
+        
+        
         self.general_vlayout=QVBoxLayout()
         self.general_vlayout.addWidget(self.tab)
         self.window.setLayout(self.general_vlayout)
@@ -86,7 +92,8 @@ class MainWindow(QObject):
         self.window.setWindowFlag(Qt.WindowStaysOnTopHint, display)
         self.window.show()
 
-        
+    def change_shuffle(self):
+        self.player_tab.shuffle_button.setChecked(False)   
     
     def list_thumbnails(self,image,id):
         lists=(self.player_tab.search_list,self.library_tab.user_playlists_songs,self.library_tab.user_playlists)

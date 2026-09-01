@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget,QHBoxLayout,QVBoxLayout,QLineEdit,QListWidget,QListWidgetItem,QPushButton,QLabel,QFileDialog,QMenu
 from PySide6.QtCore import Signal,QSize,Qt
-import threading
+import CustomWidgets
 
 
 
@@ -27,9 +27,10 @@ class LibraryTab(QWidget):
         self.library_vlayout.addStretch()
 
         self.user_playlists=QListWidget()
-        self.user_playlists.setIconSize(QSize(40,40))
+        self.user_playlists.setObjectName("library_list")
+        self.user_playlists.setIconSize(QSize(50,50))
         self.user_playlists_songs=QListWidget()
-        self.user_playlists_songs.setIconSize(QSize(40,40))
+        self.user_playlists_songs.setIconSize(QSize(50,50))
         self.user_playlists_songs.itemClicked.connect(self.play_playlist_song_at)
         self.user_playlists_songs.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.user_playlists_songs.customContextMenuRequested.connect(self.playlist_context_menu)
@@ -79,9 +80,12 @@ class LibraryTab(QWidget):
                 self.user_playlists_songs.clear()
                 for song in playlist_data:
                     artists = ", ".join(artist['name'] for artist in song['artists']) if isinstance(song['artists'], list) else song['artists']
-                    playlist_item=QListWidgetItem(f"{song['title']}-{artists}")
+                    playlist_item=QListWidgetItem()
                     playlist_item.setData(Qt.UserRole,song)
                     self.user_playlists_songs.addItem(playlist_item)
+                    playlist_song_row_element=CustomWidgets.search_row(song,artists)
+                    playlist_item.setSizeHint(playlist_song_row_element.sizeHint())
+                    self.user_playlists_songs.setItemWidget(playlist_item,playlist_song_row_element)
     
     def playlist_context_menu(self,pos):
         selected_song=self.user_playlists_songs.itemAt(pos)

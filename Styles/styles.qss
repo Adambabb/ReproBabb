@@ -1,0 +1,33 @@
+#thumbnailFrame{
+    background-color:#0d0d17;
+    color: white;
+    border-radius: 12px;
+}
+
+QWidget{
+    background-color:#0d0d17;
+}
+
+#library_list{
+        background-color:#0d0d17;
+            border-radius: 12px;
+
+}
+
+#title_search_list{
+    font-weight: bold;
+    font-size:12px;
+    font-style: italic;
+}
+
+#artist_search_list{
+    font-size:10px
+}
+
+QPushButton{
+    background-color:#9999C5;
+}
+
+QPushButton:checked{
+    background-color:#2D2D50;
+}

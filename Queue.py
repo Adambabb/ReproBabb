@@ -6,7 +6,8 @@ import random
 class SongQueue(QObject):
     
     song_data = Signal(dict)         
-
+    change_shuffle=Signal()
+    
     def __init__(self, player):
         super().__init__()
         self.player = player
@@ -37,6 +38,7 @@ class SongQueue(QObject):
         if song_to_play is not None:
             fetch_thread=threading.Thread(target=self.fetch_song,daemon=True,args=(song_to_play,))
             fetch_thread.start()
+        self.change_shuffle.emit()
     
     def next_or_previous(self,direction):
         with self.lock:

@@ -1,6 +1,6 @@
-from PySide6.QtWidgets import QWidget,QHBoxLayout,QVBoxLayout,QLineEdit,QListWidget,QPushButton,QLabel,QSizePolicy,QMenu,QTabWidget,QListWidgetItem
+from PySide6.QtWidgets import QWidget,QHBoxLayout,QVBoxLayout,QLineEdit,QListWidget,QPushButton,QLabel,QSizePolicy,QMenu,QListWidgetItem,QFrame
 from PySide6.QtGui import QIcon,QPixmap,QColor,QShortcut,QKeySequence,QAction
-from PySide6.QtCore import QTimer,Qt,QPoint,Signal
+from PySide6.QtCore import QTimer,Qt,QPoint,Signal,QSize,QEvent
 import CustomWidgets
 import os
 
@@ -26,8 +26,12 @@ class PlayerTab(QWidget):
         
         
         self.search_box=QLineEdit()
+        self.search_box.installEventFilter(self)
         search_settings_layout.addWidget(self.search_box)
         self.search_timer=QTimer()
+        self.hide_list_timer=QTimer()
+        self.hide_list_timer.setSingleShot(True)
+        self.hide_list_timer.timeout.connect(self.hide_list)
         self.search_timer.timeout.connect(self.click_search)
         self.search_timer.setSingleShot(True)
         self.search_box.textChanged.connect(lambda text: self.search_timer.start(300))
@@ -35,6 +39,7 @@ class PlayerTab(QWidget):
         
         
         self.search_list=QListWidget(self)
+        self.search_list.setIconSize(QSize(50,50))
         self.search_list.setVisible(False)
         self.available_playlists=[]
         self.search_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -51,7 +56,6 @@ class PlayerTab(QWidget):
         search_settings_layout.addWidget(settings_button)
         settings_button.clicked.connect(self.settings_menu)
         
-        vertical_layout.addLayout(search_settings_layout,1)
         
         self.thumbnail_label=QLabel()
         self.thumbnail_label.setScaledContents(True)
@@ -61,13 +65,30 @@ class PlayerTab(QWidget):
 
         self.cover_color=QColor()
         self.thumbnail_label.setMinimumSize(100,100)
+        self.thumbnail_label.setMaximumSize(300,300)
         thumbnail_layout=QHBoxLayout()
         thumbnail_layout.addStretch()
         thumbnail_layout.addWidget(self.thumbnail_label)
+        
+        actual_song=QFrame()
+        self.actual_song_title=QLabel("Nothing Playing")
+        self.actual_song_title.setObjectName("title_search_list")
+        self.actual_song_artist=QLabel("No artist")
+        self.actual_song_artist.setObjectName("artist_search_list")
+        actual_song_layout=QVBoxLayout()
+        actual_song_layout.setAlignment(Qt.AlignVCenter)
+        actual_song_layout.setSpacing(4)
+        actual_song_layout.addWidget(self.actual_song_title)
+        actual_song_layout.addWidget(self.actual_song_artist)
+        actual_song.setLayout(actual_song_layout)
+        thumbnail_layout.addWidget(actual_song)
         thumbnail_layout.addStretch()
+
         
-        
-        vertical_layout.addLayout(thumbnail_layout,6)
+        self.thumbnail_frame=QFrame()
+        self.thumbnail_frame.setLayout(thumbnail_layout)
+        self.thumbnail_frame.setObjectName("thumbnailFrame")
+        vertical_layout.addWidget(self.thumbnail_frame,6)
         
         self.current_time_label=QLabel("00:00")
         
@@ -146,6 +167,16 @@ class PlayerTab(QWidget):
         self.general_layout.addLayout(vertical_layout)
         
         self.vertical_queue_layout=QVBoxLayout()
+        
+        self.vertical_queue_layout.addLayout(search_settings_layout)
+        
+        self.vertical_queue_place=QLabel("Queue in work")
+        self.vertical_queue_layout.addWidget(self.vertical_queue_place)
+        
+        self.queue_list=QListWidget(self)
+        self.vertical_queue_layout.addWidget(self.queue_list)
+       
+        
         self.general_layout.addLayout(self.vertical_queue_layout)
         
         self.setLayout(self.general_layout)
@@ -157,6 +188,9 @@ class PlayerTab(QWidget):
 
     def click_search(self):
         search=self.search_box.text()
+        if not search:
+            self.search_list.setVisible(False)
+            return
         self.search_version+=1
         self.is_link_search = "http" in search
         self.search_requested.emit(search,self.search_version)
@@ -176,12 +210,17 @@ class PlayerTab(QWidget):
             for song in res:
                 if isinstance(song, dict) and song.get("status") == "success":
                     artists = ", ".join(artist['name'] for artist in song['artists']) if isinstance(song['artists'], list) else song['artists']
-                    search_list_element=QListWidgetItem(f"{song['title']}-{artists}")
+                    search_list_element=QListWidgetItem()
                     search_list_element.setData(Qt.UserRole,song)
                     self.search_list.addItem(search_list_element)
+                    search_row_element=CustomWidgets.search_row(song,artists)
+                    search_list_element.setSizeHint(search_row_element.sizeHint())
+                    self.search_list.setItemWidget(search_list_element,search_row_element)
             self.search_list.setVisible((self.search_list.count() > 0))
-        self.shuffle_button.setChecked(False)
+    
+    
         
+       
     def on_search_enter(self):
         self.search_timer.stop()
         self.click_search()
@@ -220,6 +259,15 @@ class PlayerTab(QWidget):
         if self.search_list.isVisible():
             self.search_list.raise_()
         self.visualizer.update()
+    
+    def update_title_artist(self,song):
+        title = song.get("title", "Unknown Title")
+        artists = song.get("artists", "")
+        if isinstance(artists, list):
+            artists = ", ".join(a.get("name", "") if isinstance(a, dict) else str(a) for a in artists)
+    
+        self.actual_song_title.setText(title)
+        self.actual_song_artist.setText(str(artists))
             
     def next_song_play(self):
         self.next_requested.emit()
@@ -290,3 +338,11 @@ class PlayerTab(QWidget):
     def show_error(self, message):
         self.status_label.setText(message)
         QTimer.singleShot(3000, lambda: self.status_label.setText(""))
+        
+    def hide_list(self):
+        self.search_list.setVisible(False)
+
+    def eventFilter(self, obj, event):
+        if obj == self.search_box and event.type() == QEvent.FocusOut:
+            self.hide_list_timer.start(100)
+        return super().eventFilter(obj, event)

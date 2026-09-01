@@ -1,5 +1,5 @@
 from PySide6.QtCore import Signal,QPointF,QTimer,Qt
-from PySide6.QtWidgets import QWidget,QLabel,QHBoxLayout,QSlider
+from PySide6.QtWidgets import QWidget,QLabel,QHBoxLayout,QSlider,QFrame,QVBoxLayout
 from PySide6.QtGui import QPainter,QColor,QShortcut,QKeySequence,QPixmap
 
 import random
@@ -163,3 +163,15 @@ class VolumeDesign(QWidget):
             border-radius: 6px;
         }}
     """)
+    
+def search_row(song,artists):
+    search_list_song=QFrame()
+    search_list_song_title=QLabel(song.get("title",""))
+    search_list_song_title.setObjectName("title_search_list")
+    search_list_song_artist=QLabel(artists)
+    search_list_song_artist.setObjectName("artist_search_list")
+    search_list_layout=QVBoxLayout()
+    search_list_layout.addWidget(search_list_song_title)
+    search_list_layout.addWidget(search_list_song_artist)
+    search_list_song.setLayout(search_list_layout)
+    return search_list_song
