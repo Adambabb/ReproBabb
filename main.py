@@ -1,7 +1,9 @@
-from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout,QTabWidget,QMessageBox
+import json
+
+from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout,QTabWidget,QMessageBox,QDialog
 from PySide6.QtGui import QIcon, QPixmap
-import PlayerTab,LibraryTab,Network,Motor,Queue,Player,sys
 from PySide6.QtCore import Qt,QTimer,Qt,Signal,QObject,QSettings
+import PlayerTab,LibraryTab,Network,Motor,Queue,Player,sys,Login
 import threading
 import os
 
@@ -27,7 +29,7 @@ class MainWindow(QObject):
         self.search_completed.connect(self.on_search_completed)
         self.fetched_playlist.connect(self.on_playlist_fetched)
         
-        self.always_on_toggle(True)
+        self.always_on_toggle(False)
         
         self.player_tab=PlayerTab.PlayerTab()
         self.visualizer=self.player_tab.visualizer
@@ -56,8 +58,9 @@ class MainWindow(QObject):
         self.library_tab.playlist_content_selected.connect(self.select_user_playlist)
         self.library_tab.playlist_play_requested.connect(self.queue.playing_playlist)
         self.library_tab.song_playlist_delete.connect(self.handle_remove_song)
+        self.library_tab.create_browser_requested.connect(self.create_browser)
         self.tab.addTab(self.library_tab,"Library")
-  
+        
         self.player.error_occurred.connect(self.player_tab.show_error)
         self.player.state_changed.connect(self.update_play_icon)
 
@@ -211,6 +214,19 @@ class MainWindow(QObject):
         if remove_response["status"]=="success":
             self.get_user_playlist_data(playlist_id)
 
+    def create_browser(self):
+        login_dialog=Login.LoginDialog()
+        if login_dialog.exec() == QDialog.Accepted:
+            file_path = os.path.abspath("browser.json")
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(login_dialog.headers_dict, f, indent=4)
+                self.select_load_account(file_path, True)
+            except Exception as e:
+                print(f"Error saving session file: {e}")
+        
+        
+    
 start=MainWindow()
 close=start.app.exec()
 

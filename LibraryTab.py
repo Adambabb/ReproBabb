@@ -6,6 +6,7 @@ import CustomWidgets
 
 class LibraryTab(QWidget):
     load_account_requested=Signal(str,bool)
+    create_browser_requested=Signal()
     playlist_content_selected=Signal(dict)
     playlist_play_requested=Signal(list,int)
     song_playlist_delete=Signal(str,dict)
@@ -19,6 +20,9 @@ class LibraryTab(QWidget):
         self.browser_route=QLineEdit()
         self.browser_route.setReadOnly(True)
         self.library_state_hlayout.addWidget(self.browser_route)
+        self.create_browser_button=QPushButton("Create Browser: To load account")
+        self.create_browser_button.clicked.connect(self.create_browser)
+        self.library_vlayout.addWidget(self.create_browser_button)
         self.browser_search=QPushButton("Browse_Account:...")
         self.browser_search.clicked.connect(self.select_load_account)
         self.library_state_hlayout.addWidget(self.browser_search)
@@ -95,3 +99,6 @@ class LibraryTab(QWidget):
             delete_action=menu.addAction("Remove from playlist")
             delete_action.triggered.connect(lambda: self.song_playlist_delete.emit(self.current_playlist.get("playlistId",""),song_data))
             menu.exec(self.user_playlists_songs.mapToGlobal(pos))
+    
+    def create_browser(self):
+        self.create_browser_requested.emit()

@@ -27,6 +27,8 @@ class PlayerTab(QWidget):
         
         self.search_box=QLineEdit()
         self.search_box.installEventFilter(self)
+        self.download_song=QPushButton("Download Song")
+        search_settings_layout.addWidget(self.download_song)
         search_settings_layout.addWidget(self.search_box)
         self.search_timer=QTimer()
         self.hide_list_timer=QTimer()
@@ -71,6 +73,7 @@ class PlayerTab(QWidget):
         thumbnail_layout.addWidget(self.thumbnail_label)
         
         actual_song=QFrame()
+        self.actual_song={}
         self.actual_song_title=QLabel("Nothing Playing")
         self.actual_song_title.setObjectName("title_search_list")
         self.actual_song_artist=QLabel("No artist")
@@ -261,6 +264,7 @@ class PlayerTab(QWidget):
         self.visualizer.update()
     
     def update_title_artist(self,song):
+        self.actual_song=song
         title = song.get("title", "Unknown Title")
         artists = song.get("artists", "")
         if isinstance(artists, list):
