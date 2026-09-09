@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget,QHBoxLayout,QVBoxLayout,QLineEdit,QListWidget,QPushButton,QLabel,QSizePolicy,QMenu,QListWidgetItem,QFrame
+from PySide6.QtWidgets import QWidget,QHBoxLayout,QVBoxLayout,QLineEdit,QListWidget,QPushButton,QLabel,QSizePolicy,QMenu,QListWidgetItem,QFrame,QProgressBar
 from PySide6.QtGui import QIcon,QPixmap,QColor,QShortcut,QKeySequence,QAction
 from PySide6.QtCore import QTimer,Qt,QPoint,Signal,QSize,QEvent
 import CustomWidgets
@@ -16,6 +16,7 @@ class PlayerTab(QWidget):
     time_changed=Signal(int)
     always_on_toggle=Signal(bool)
     added_playlist=Signal(str,dict)
+    download_requested=Signal(dict)
 
     def __init__(self):
         super().__init__()
@@ -28,6 +29,23 @@ class PlayerTab(QWidget):
         self.search_box=QLineEdit()
         self.search_box.installEventFilter(self)
         self.download_song=QPushButton("Download Song")
+        self.download_song.clicked.connect(lambda: self.download_requested.emit(self.actual_song))
+        self.download_song.installEventFilter(self)
+        self.download_progress=QProgressBar(self.download_song)
+        self.download_progress.setVisible(False)
+        self.download_progress.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #555555;
+                border-radius: 4px;
+                background-color: #222222; /* Color del fondo de la barra */
+                max-height: 100%;
+                min-height: 100%;
+            }
+            QProgressBar::chunk {
+                background-color: #00FF00; /* ESTE es el color del progreso (Verde brillante) */
+                width: 100%;
+            }
+        """)
         search_settings_layout.addWidget(self.download_song)
         search_settings_layout.addWidget(self.search_box)
         self.search_timer=QTimer()
@@ -76,8 +94,10 @@ class PlayerTab(QWidget):
         self.actual_song={}
         self.actual_song_title=QLabel("Nothing Playing")
         self.actual_song_title.setObjectName("title_search_list")
+        self.actual_song_title.setWordWrap(True)
         self.actual_song_artist=QLabel("No artist")
         self.actual_song_artist.setObjectName("artist_search_list")
+        self.actual_song_artist.setWordWrap(True)
         actual_song_layout=QVBoxLayout()
         actual_song_layout.setAlignment(Qt.AlignVCenter)
         actual_song_layout.setSpacing(4)
@@ -349,4 +369,21 @@ class PlayerTab(QWidget):
     def eventFilter(self, obj, event):
         if obj == self.search_box and event.type() == QEvent.FocusOut:
             self.hide_list_timer.start(100)
+        elif obj == self.download_song:
+            if event.type() == QEvent.Enter:
+                # En lugar de ocultar el botón (que mueve el layout), 
+                # quitamos el texto y mostramos la barra.
+                self.download_song.setText("") 
+                self.download_progress.setVisible(True)
+            elif event.type() == QEvent.Leave:
+                # Volvemos el texto y ocultamos la barra.
+                self.download_song.setText("Download Song")
+                self.download_progress.setVisible(False)
+            elif event.type() == QEvent.Resize:
+                # Ajusta el tamaño de la barra al tamaño del botón
+                self.download_progress.setGeometry(0, 0, self.download_song.width(), self.download_song.height())
         return super().eventFilter(obj, event)
+
+    
+    def update_download_progress(self, data):
+        self.download_progress.setValue(data['percentage'])

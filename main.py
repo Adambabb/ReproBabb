@@ -1,6 +1,6 @@
 import json
 
-from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout,QTabWidget,QMessageBox,QDialog
+from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout,QTabWidget,QMessageBox,QDialog,QFileDialog
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtCore import Qt,QTimer,Qt,Signal,QObject,QSettings
 import PlayerTab,LibraryTab,Network,Motor,Queue,Player,sys,Login
@@ -11,6 +11,7 @@ import os
 class MainWindow(QObject):
     fetched_playlist=Signal(bool,list)
     search_completed=Signal(object)
+    progress_signal=Signal(dict)
     def __init__(self):
         super().__init__()
         self.app=QApplication([])
@@ -22,6 +23,7 @@ class MainWindow(QObject):
         with styles_file  as styles:
             self.app.setStyleSheet(styles.read())
         self.settings=QSettings("Reprobabb","Reprobabb")
+        
         self.tab=QTabWidget()
         self.song_timer=QTimer()
         self.song_timer.timeout.connect(self.update_timeline)
@@ -50,6 +52,8 @@ class MainWindow(QObject):
         self.player_tab.play_next_requested.connect(self.queue.add_to_queue)
         self.player_tab.search_requested.connect(self.search)
         self.player_tab.added_playlist.connect(self.add_song_playlist)
+        self.player_tab.download_requested.connect(self.download)
+        self.progress_signal.connect(self.player_tab.update_download_progress)
         
         self.player_tab.always_on_toggle.connect(self.always_on_toggle)
         self.tab.addTab(self.player_tab,"Reproducer")
@@ -59,6 +63,7 @@ class MainWindow(QObject):
         self.library_tab.playlist_play_requested.connect(self.queue.playing_playlist)
         self.library_tab.song_playlist_delete.connect(self.handle_remove_song)
         self.library_tab.create_browser_requested.connect(self.create_browser)
+        self.library_tab.playlist_download_requested.connect(self.download_playlist)
         self.tab.addTab(self.library_tab,"Library")
         
         self.player.error_occurred.connect(self.player_tab.show_error)
@@ -225,8 +230,63 @@ class MainWindow(QObject):
             except Exception as e:
                 print(f"Error saving session file: {e}")
         
+    def download(self,song_data):
+        song_id=song_data.get("id","")
+        self.player_tab.download_progress.setValue(0)
+        if self.settings.value("download_path", None) is None:
+            file_path=QFileDialog.getExistingDirectory(self.window,"Select Download Folder")
+            if file_path is None or file_path.strip() == "":
+                return
+            self.settings.setValue("download_path", file_path)
+        else:
+            file_path=self.settings.value("download_path", None)
         
+
+        downlaod_song_thread=threading.Thread(target=self.download_song,daemon=True,args=(song_id,True,file_path))
+        downlaod_song_thread.start()
     
+    def download_song(self,song_id,download,destination):
+        
+        download_response= Motor.fetch(song_id, download, destination, progress_hook=self.update_progress)
+
+        if download_response["status"]=="success":
+            print(f"Song downloaded successfully to {destination}")
+        else:
+            print(f"Error downloading song: {download_response.get('error', 'Unknown error')}")
+            
+            
+    def update_progress(self,progress_data):
+        if progress_data.get('status') == 'downloading':
+            try:
+                downloaded = progress_data.get('downloaded_bytes', 0)
+                total = progress_data.get('total_bytes', 1)
+                percentage = int((downloaded / total) * 100)
+                self.progress_signal.emit({"percentage": percentage})
+            except Exception as e:
+                print(f"Error procesando progreso: {e}")
+    
+    
+    def download_playlist(self,songs,playlist_name):
+        if self.settings.value("download_path", None) is None:
+            file_path=QFileDialog.getExistingDirectory(self.window,"Select Download Folder")
+            if file_path is None or file_path.strip() == "":
+                return
+            self.settings.setValue("download_path", file_path)
+        else:
+            file_path=self.settings.value("download_path", None)
+        
+        playlist_folder=os.path.join(file_path,playlist_name)
+        os.makedirs(playlist_folder,exist_ok=True)
+        
+  
+        downlaod_song_thread=threading.Thread(target=self.downdload_playlist_songs,daemon=True,args=(songs,playlist_folder))
+        downlaod_song_thread.start()
+    
+    def downdload_playlist_songs(self,songs,playlist_folder):
+        for song in songs:
+            song_id=song.get("id","")
+            self.download_song(song_id,True,playlist_folder)
+
 start=MainWindow()
 close=start.app.exec()
 

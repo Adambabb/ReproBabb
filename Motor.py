@@ -166,15 +166,30 @@ fetcher_options = {
     }
 }
     
-def fetch(video_id):
-    with yt_dlp.YoutubeDL(fetcher_options) as fetcher:
+def fetch(video_id, download=False, destination=None,progress_hook=None):
+    options=fetcher_options.copy()
+    if download:
+        options['outtmpl']=f"{destination}/%(title)s.%(ext)s"
+    if progress_hook:
+        options['progress_hooks'] = [progress_hook]
+    with yt_dlp.YoutubeDL(options) as fetcher:
         try:
-            info=fetcher.extract_info(video_id,download=False)
-            fetch_result={"url": info["url"],
-                         "status": "success"}
+            info=fetcher.extract_info(video_id,download)
+
+            if download==False:
+                fetch_result={"url": info["url"],
+                            "status": "success"}
+            else:
+                    
+                fetch_result={"url":fetcher.prepare_filename(info),
+                            "status": "success"}
+            
             return fetch_result
         except Exception as e:
             error_message = str(e)
             fetch_result={"error": error_message,
                          "status": "error"}
             return fetch_result
+
+    
+        
