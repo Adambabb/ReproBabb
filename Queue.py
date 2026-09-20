@@ -1,12 +1,14 @@
-from PySide6.QtCore import QObject,Signal,QTimer
+from PySide6.QtCore import QObject,Signal,QTimer,Qt
 import Motor
 import threading
 import random
+import CustomWidgets
 
 class SongQueue(QObject):
     
     song_data = Signal(dict)         
     change_shuffle=Signal()
+    update_queue=Signal(list)
     
     def __init__(self, player):
         super().__init__()
@@ -24,6 +26,8 @@ class SongQueue(QObject):
         self.shuffle_song_list=[]
         self.shuffle_current_index=0
         self.fetch_version=0
+        
+
 
     def playing_playlist(self, playlist,start_index=0):
         song_to_play=None
@@ -32,6 +36,7 @@ class SongQueue(QObject):
             self.is_shuffle=False
             self.current_index = start_index if 0 <= start_index < len(playlist) else 0
             self.songs_list=playlist
+            self.update_queue.emit(self.songs_list)
             if len(self.songs_list)>0:
                 song=self.songs_list[self.current_index]
                 song_to_play=song
@@ -122,6 +127,15 @@ class SongQueue(QObject):
                     self.shuffle_current_index=self.shuffle_song_list.index(self.current_index)
                 else:
                     self.shuffle_current_index=0
+                    
+                new_list = [self.songs_list[i] for i in self.shuffle_song_list]
+                self.update_queue.emit(new_list)
+            else:
+                self.update_queue.emit(self.songs_list)
+
+
+
+                
         
     def get_song_index(self):
         if self.is_shuffle:
@@ -159,6 +173,23 @@ class SongQueue(QObject):
             else:
                 insert_index=self.current_index+1
                 self.songs_list.insert(insert_index,song)
+            self.update_queue.emit(self.songs_list)
+                
+    def add_multiple_to_queue(self, songs):
+        with self.lock:
+            if self.is_shuffle:
+                insert_index = self.shuffle_current_index + 1
+                for song in songs:
+                    self.songs_list.append(song)
+                    new_song_index = len(self.songs_list) - 1
+                    self.shuffle_song_list.insert(insert_index, new_song_index)
+                    insert_index += 1
+            else:
+                insert_index = self.current_index + 1
+                for song in songs:
+                    self.songs_list.insert(insert_index, song)
+                    insert_index += 1
+        self.update_queue.emit(self.songs_list)
 
                 
         

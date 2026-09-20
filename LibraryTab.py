@@ -10,6 +10,7 @@ class LibraryTab(QWidget):
     playlist_content_selected=Signal(dict)
     playlist_play_requested=Signal(list,int)
     song_playlist_delete=Signal(str,dict)
+    playlist_download_requested=Signal(list,str)
     def __init__(self):
         super().__init__()
         self.playlists_songs=QHBoxLayout()
@@ -28,6 +29,9 @@ class LibraryTab(QWidget):
         self.library_state_hlayout.addWidget(self.browser_search)
         self.library_vlayout.addLayout(self.library_state_hlayout)
         
+        self.download_playlist_button=QPushButton("Download Playlist")
+        self.download_playlist_button.clicked.connect(self.download_playlist)
+        self.library_vlayout.addWidget(self.download_playlist_button)
         self.library_vlayout.addStretch()
 
         self.user_playlists=QListWidget()
@@ -102,3 +106,8 @@ class LibraryTab(QWidget):
     
     def create_browser(self):
         self.create_browser_requested.emit()
+    
+    def download_playlist(self):
+        if self.current_playlist:
+            songs = [self.user_playlists_songs.item(i).data(Qt.UserRole) for i in range(self.user_playlists_songs.count())]
+            self.playlist_download_requested.emit(songs,self.current_playlist.get("title",""))

@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget,QHBoxLayout,QVBoxLayout,QLineEdit,QListWidget,QPushButton,QLabel,QSizePolicy,QMenu,QListWidgetItem,QFrame
+from PySide6.QtWidgets import QWidget,QHBoxLayout,QVBoxLayout,QLineEdit,QListWidget,QPushButton,QLabel,QSizePolicy,QMenu,QListWidgetItem,QFrame,QAbstractItemView
 from PySide6.QtGui import QIcon,QPixmap,QColor,QShortcut,QKeySequence,QAction
 from PySide6.QtCore import QTimer,Qt,QPoint,Signal,QSize,QEvent
 import CustomWidgets
@@ -16,6 +16,7 @@ class PlayerTab(QWidget):
     time_changed=Signal(int)
     always_on_toggle=Signal(bool)
     added_playlist=Signal(str,dict)
+    download_requested=Signal(dict)
 
     def __init__(self):
         super().__init__()
@@ -28,6 +29,8 @@ class PlayerTab(QWidget):
         self.search_box=QLineEdit()
         self.search_box.installEventFilter(self)
         self.download_song=QPushButton("Download Song")
+        self.download_song.clicked.connect(lambda: self.download_requested.emit(self.actual_song))
+        
         search_settings_layout.addWidget(self.download_song)
         search_settings_layout.addWidget(self.search_box)
         self.search_timer=QTimer()
@@ -76,8 +79,10 @@ class PlayerTab(QWidget):
         self.actual_song={}
         self.actual_song_title=QLabel("Nothing Playing")
         self.actual_song_title.setObjectName("title_search_list")
+        self.actual_song_title.setWordWrap(True)
         self.actual_song_artist=QLabel("No artist")
         self.actual_song_artist.setObjectName("artist_search_list")
+        self.actual_song_artist.setWordWrap(True)
         actual_song_layout=QVBoxLayout()
         actual_song_layout.setAlignment(Qt.AlignVCenter)
         actual_song_layout.setSpacing(4)
@@ -177,6 +182,7 @@ class PlayerTab(QWidget):
         self.vertical_queue_layout.addWidget(self.vertical_queue_place)
         
         self.queue_list=QListWidget(self)
+        self.queue_list.setIconSize(QSize(60,60))
         self.vertical_queue_layout.addWidget(self.queue_list)
        
         
@@ -323,6 +329,8 @@ class PlayerTab(QWidget):
                 play_next_action=menu.addAction("Play Next")
                 play_next_action.triggered.connect(lambda: (self.play_next_requested.emit(song_data), self.search_list.hide()))
                 add_song_playlist=menu.addMenu("Add to playlist")
+                download_selected_song=menu.addAction("Download")
+                download_selected_song.triggered.connect(lambda:(self.download_requested.emit(song_data)))
                 for playlist in self.available_playlists:
                     playlist_to_select=add_song_playlist.addAction(playlist["title"])
                     playlist_to_select.triggered.connect(lambda checked=False, p=playlist["playlistId"], s=song_data: self.added_playlist.emit(p,s))                
@@ -349,4 +357,50 @@ class PlayerTab(QWidget):
     def eventFilter(self, obj, event):
         if obj == self.search_box and event.type() == QEvent.FocusOut:
             self.hide_list_timer.start(100)
+        elif obj == self.download_song:
+            if event.type() == QEvent.Enter:
+                # En lugar de ocultar el botón (que mueve el layout), 
+                # quitamos el texto y mostramos la barra.
+                self.download_song.setText("") 
+                self.download_progress.setVisible(True)
+            elif event.type() == QEvent.Leave:
+                # Volvemos el texto y ocultamos la barra.
+                self.download_song.setText("Download Song")
+                self.download_progress.setVisible(False)
+            elif event.type() == QEvent.Resize:
+                # Ajusta el tamaño de la barra al tamaño del botón
+                self.download_progress.setGeometry(0, 0, self.download_song.width(), self.download_song.height())
         return super().eventFilter(obj, event)
+    
+
+                    
+    def update_queue_list(self, songs):
+        self.queue_list.clear()
+        target_item = None
+        
+        # Obtener un ID único de la canción actual para comparar de forma segura
+        current_id = self.actual_song.get("videoId") or self.actual_song.get("id") if isinstance(self.actual_song, dict) else None
+
+        for song in songs:
+            artists = ", ".join(artist['name'] for artist in song['artists']) if isinstance(song['artists'], list) else song['artists']
+            queue_list_element = QListWidgetItem()
+            queue_list_element.setData(Qt.UserRole, song)
+            self.queue_list.addItem(queue_list_element)
+            
+            queue_row_element = CustomWidgets.queue(song, artists)
+            queue_list_element.setSizeHint(queue_row_element.sizeHint())
+            self.queue_list.setItemWidget(queue_list_element, queue_row_element)
+            
+            # Comparar por ID único o por igualdad directa
+            song_id = song.get("videoId") or song.get("id") if isinstance(song, dict) else None
+            if (current_id and song_id == current_id) or song == self.actual_song:
+                target_item = queue_list_element
+
+        # Hacer el desplazamiento si se encontró la canción
+        if target_item:
+            # Asegura que el layout de la lista haya calculado los tamaños
+            self.queue_list.doItemsLayout() 
+            self.queue_list.scrollToItem(target_item, QAbstractItemView.PositionAtTop)
+
+
+    
