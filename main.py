@@ -1,17 +1,19 @@
 import json
-
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout,QTabWidget,QMessageBox,QDialog,QFileDialog
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtCore import Qt,QTimer,Qt,Signal,QObject,QSettings
-import PlayerTab,LibraryTab,Network,Motor,Queue,Player,sys,Login
+import PlayerTab,LibraryTab,Network,Motor,Queue,Player,sys,Login,DownloadTab,DownloadQueue
 import threading
 import os
+from yt_dlp.utils import DownloadCancelled
 
                 
 class MainWindow(QObject):
     fetched_playlist=Signal(bool,list)
     search_completed=Signal(object)
     progress_signal=Signal(dict)
+    # En __init__ de MainWindow, añade una señal nueva:
+    similar_songs_fetched = Signal(list)
     def __init__(self):
         super().__init__()
         self.app=QApplication([])
@@ -27,9 +29,15 @@ class MainWindow(QObject):
         self.tab=QTabWidget()
         self.song_timer=QTimer()
         self.song_timer.timeout.connect(self.update_timeline)
+
+        self.download_queue=DownloadQueue.DownloadQueue()
+        self.refresh_download_timer=QTimer()
+        self.refresh_download_timer.timeout.connect(self.refresh_download)
+        self.refresh_download_timer.start(500)
         
         self.search_completed.connect(self.on_search_completed)
         self.fetched_playlist.connect(self.on_playlist_fetched)
+        # En __init__, conéctala (fuera del constructor, junto a las demás conexiones):
         
         self.always_on_toggle(False)
         
@@ -40,6 +48,7 @@ class MainWindow(QObject):
         self.player=Player.AudioController()
         self.queue=Queue.SongQueue(self.player)        
         self.thumbnail=Network.ThumbnailFetcher(self.queue)
+        self.download_tab=DownloadTab.DownloadTab()
         
         #===============================Connections========================================#
         self.player_tab.play_pause_toggled.connect(self.toggle_play_pause)
@@ -49,11 +58,11 @@ class MainWindow(QObject):
         self.player_tab.volume_changed.connect(self.player.set_volume)
         self.player_tab.shuffle_requested.connect(self.queue.shuffle_queue)
         self.player_tab.play_requested.connect(self.queue.playing_playlist)
+        self.player_tab.play_requested.connect(self.get_similar_song_thread)
         self.player_tab.play_next_requested.connect(self.queue.add_to_queue)
         self.player_tab.search_requested.connect(self.search)
         self.player_tab.added_playlist.connect(self.add_song_playlist)
         self.player_tab.download_requested.connect(self.download)
-        self.progress_signal.connect(self.player_tab.update_download_progress)
         
         self.player_tab.always_on_toggle.connect(self.always_on_toggle)
         self.tab.addTab(self.player_tab,"Reproducer")
@@ -66,6 +75,9 @@ class MainWindow(QObject):
         self.library_tab.playlist_download_requested.connect(self.download_playlist)
         self.tab.addTab(self.library_tab,"Library")
         
+        self.download_tab.cancel_download_requested.connect(self.download_queue.cancel_download)
+        self.tab.addTab(self.download_tab,"Downloads")
+        
         self.player.error_occurred.connect(self.player_tab.show_error)
         self.player.state_changed.connect(self.update_play_icon)
 
@@ -76,6 +88,9 @@ class MainWindow(QObject):
 
         self.queue.song_data.connect(self.player_tab.update_title_artist)
         self.queue.change_shuffle.connect(self.change_shuffle)
+        self.queue.update_queue.connect(self.update_queue_in_ui)
+        self.similar_songs_fetched.connect(self.queue.add_multiple_to_queue)
+
         
         
         self.general_vlayout=QVBoxLayout()
@@ -104,7 +119,7 @@ class MainWindow(QObject):
         self.player_tab.shuffle_button.setChecked(False)   
     
     def list_thumbnails(self,image,id):
-        lists=(self.player_tab.search_list,self.library_tab.user_playlists_songs,self.library_tab.user_playlists)
+        lists=(self.player_tab.search_list,self.library_tab.user_playlists_songs,self.library_tab.user_playlists,self.player_tab.queue_list)
         list_image=QPixmap()
         list_image.loadFromData(image)
         list_icon=QIcon(list_image)
@@ -232,7 +247,6 @@ class MainWindow(QObject):
         
     def download(self,song_data):
         song_id=song_data.get("id","")
-        self.player_tab.download_progress.setValue(0)
         if self.settings.value("download_path", None) is None:
             file_path=QFileDialog.getExistingDirectory(self.window,"Select Download Folder")
             if file_path is None or file_path.strip() == "":
@@ -240,19 +254,31 @@ class MainWindow(QObject):
             self.settings.setValue("download_path", file_path)
         else:
             file_path=self.settings.value("download_path", None)
-        
 
-        downlaod_song_thread=threading.Thread(target=self.download_song,daemon=True,args=(song_id,True,file_path))
+        download_id=self.download_queue.register_download(song_data.get("title",""))
+
+        downlaod_song_thread=threading.Thread(target=self.download_song,daemon=True,args=(song_id,True,file_path,download_id))
         downlaod_song_thread.start()
     
-    def download_song(self,song_id,download,destination):
-        
-        download_response= Motor.fetch(song_id, download, destination, progress_hook=self.update_progress)
+    def download_song(self,song_id,download,destination,download_id):
+        self.download_queue.update_status(download_id,"downloading")
+
+        def progress_hook(progress_data):
+            if self.download_queue.is_cancelled(download_id):
+                raise DownloadCancelled()
+            self.download_queue.update_progress(download_id, self.update_progress(progress_data))
+
+        download_response= Motor.fetch(song_id, download, destination, progress_hook=progress_hook)
 
         if download_response["status"]=="success":
+            self.download_queue.update_status(download_id,"finished")
             print(f"Song downloaded successfully to {destination}")
         else:
-            print(f"Error downloading song: {download_response.get('error', 'Unknown error')}")
+            if self.download_queue.is_cancelled(download_id):
+                self.download_queue.update_status(download_id,"cancelled")
+            else:
+                self.download_queue.update_status(download_id,"error")
+                print(f"Error downloading song: {download_response.get('error', 'Unknown error')}")
             
             
     def update_progress(self,progress_data):
@@ -262,8 +288,14 @@ class MainWindow(QObject):
                 total = progress_data.get('total_bytes', 1)
                 percentage = int((downloaded / total) * 100)
                 self.progress_signal.emit({"percentage": percentage})
+                return percentage
             except Exception as e:
                 print(f"Error procesando progreso: {e}")
+                return 0
+        elif progress_data.get('status') == 'finished':
+            self.progress_signal.emit({"percentage": 100})
+            return 100
+        return 0
     
     
     def download_playlist(self,songs,playlist_name):
@@ -277,15 +309,41 @@ class MainWindow(QObject):
         
         playlist_folder=os.path.join(file_path,playlist_name)
         os.makedirs(playlist_folder,exist_ok=True)
-        
-  
-        downlaod_song_thread=threading.Thread(target=self.downdload_playlist_songs,daemon=True,args=(songs,playlist_folder))
+
+        songs_with_ids = []
+        for song in songs:
+            download_id = self.download_queue.register_download(song.get("title", ""))
+            songs_with_ids.append((song, download_id))
+
+        downlaod_song_thread=threading.Thread(target=self.download_playlist_songs,daemon=True,args=(playlist_folder,songs_with_ids))
         downlaod_song_thread.start()
     
-    def downdload_playlist_songs(self,songs,playlist_folder):
-        for song in songs:
+    def download_playlist_songs(self,playlist_folder,songs_with_ids):
+        for song, download_id in songs_with_ids:
             song_id=song.get("id","")
-            self.download_song(song_id,True,playlist_folder)
+            self.download_song(song_id,True,playlist_folder,download_id)
+
+    def refresh_download(self):
+        if self.download_queue.downloads:
+            self.download_tab.refresh_downloads(self.download_queue.get_data())
+            
+    def update_queue_in_ui(self,songs):
+        self.player_tab.update_queue_list(songs)
+        for song in songs:
+            if isinstance(song, dict) and song.get("status") == "success":
+                self.thumbnail.download_list_thumbnail(song)
+    
+    
+    def get_similar_song_thread(self,song_data):
+        if len(song_data)==1:
+            only_song = song_data[0]
+            videoId=only_song.get("id")
+            search_similar_song=threading.Thread(target=self.get_similar_song,daemon=True,args=(videoId,))
+            search_similar_song.start()
+        
+    def get_similar_song(self,videoId):
+        returned_songs=Motor.get_similar_songs(videoId)
+        self.similar_songs_fetched.emit(returned_songs)
 
 start=MainWindow()
 close=start.app.exec()

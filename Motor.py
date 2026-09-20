@@ -190,6 +190,22 @@ def fetch(video_id, download=False, destination=None,progress_hook=None):
             fetch_result={"error": error_message,
                          "status": "error"}
             return fetch_result
+        
+# DESPUÉS
+def get_similar_songs(video_id):
+    try:
+        watch_data = searcher.get_watch_playlist(videoId=video_id, limit=25)
+        tracks = watch_data.get("tracks", [])
+        similar_songs = []
+        for track in tracks:
+            if track.get("videoId") == video_id:
+                continue  # nos saltamos la propia canción
+            similar_songs.append(music_data(track))
+        return similar_songs
+    except Exception as e:
+        print(f"Error al obtener similares: {e}")
+        return []
+
 
     
         

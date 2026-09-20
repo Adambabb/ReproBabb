@@ -175,3 +175,15 @@ def search_row(song,artists):
     search_list_layout.addWidget(search_list_song_artist)
     search_list_song.setLayout(search_list_layout)
     return search_list_song
+
+def queue(song,artists):
+    queue_list_song=QFrame()
+    queue_list_song_title=QLabel(song.get("title",""))
+    queue_list_song_title.setObjectName("title_search_list")
+    queue_list_song_artist=QLabel(artists)
+    queue_list_song_artist.setObjectName("artist_search_list")
+    queue_list_song_layout=QVBoxLayout()
+    queue_list_song_layout.addWidget(queue_list_song_title)
+    queue_list_song_layout.addWidget(queue_list_song_artist)
+    queue_list_song.setLayout(queue_list_song_layout)
+    return queue_list_song
