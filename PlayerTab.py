@@ -17,6 +17,7 @@ class PlayerTab(QWidget):
     always_on_toggle=Signal(bool)
     added_playlist=Signal(str,dict)
     download_requested=Signal(dict)
+    play_queue_song=Signal(list,int)
 
     def __init__(self):
         super().__init__()
@@ -183,6 +184,8 @@ class PlayerTab(QWidget):
         
         self.queue_list=QListWidget(self)
         self.queue_list.setIconSize(QSize(60,60))
+        self.queue_list.itemClicked.connect(self.play_playlist_song_at)
+
         self.vertical_queue_layout.addWidget(self.queue_list)
        
         
@@ -378,7 +381,6 @@ class PlayerTab(QWidget):
         self.queue_list.clear()
         target_item = None
         
-        # Obtener un ID único de la canción actual para comparar de forma segura
         current_id = self.actual_song.get("videoId") or self.actual_song.get("id") if isinstance(self.actual_song, dict) else None
 
         for song in songs:
@@ -391,16 +393,20 @@ class PlayerTab(QWidget):
             queue_list_element.setSizeHint(queue_row_element.sizeHint())
             self.queue_list.setItemWidget(queue_list_element, queue_row_element)
             
-            # Comparar por ID único o por igualdad directa
             song_id = song.get("videoId") or song.get("id") if isinstance(song, dict) else None
             if (current_id and song_id == current_id) or song == self.actual_song:
                 target_item = queue_list_element
 
-        # Hacer el desplazamiento si se encontró la canción
         if target_item:
-            # Asegura que el layout de la lista haya calculado los tamaños
             self.queue_list.doItemsLayout() 
             self.queue_list.scrollToItem(target_item, QAbstractItemView.PositionAtTop)
+            
+    def play_playlist_song_at(self,item):
+        songs = [self.queue_list.item(i).data(Qt.UserRole)
+                for i in range(self.queue_list.count())]
+        start_index = self.queue_list.row(item)
+        self.play_queue_song.emit(songs,start_index)
+
 
 
     

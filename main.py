@@ -59,6 +59,7 @@ class MainWindow(QObject):
         self.player_tab.shuffle_requested.connect(self.queue.shuffle_queue)
         self.player_tab.play_requested.connect(self.queue.playing_playlist)
         self.player_tab.play_requested.connect(self.get_similar_song_thread)
+        self.player_tab.play_queue_song.connect(self.queue.playing_playlist)
         self.player_tab.play_next_requested.connect(self.queue.add_to_queue)
         self.player_tab.search_requested.connect(self.search)
         self.player_tab.added_playlist.connect(self.add_song_playlist)
