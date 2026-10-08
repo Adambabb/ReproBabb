@@ -191,5 +191,17 @@ class SongQueue(QObject):
                     insert_index += 1
         self.update_queue.emit(self.songs_list)
 
+    def reorder_queue(self,new_order):
+        with self.lock:
+            actual_song_playing=self.get_song_index()
+            self.songs_list = new_order
+            if actual_song_playing:
+                for position, song in enumerate(new_order):
+                    if song.get("id")==actual_song_playing.get("id"):
+                        self.current_index=position
+                        break
+                    
+        
+        
                 
         

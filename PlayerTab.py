@@ -3,6 +3,7 @@ from PySide6.QtGui import QIcon,QPixmap,QColor,QShortcut,QKeySequence,QAction
 from PySide6.QtCore import QTimer,Qt,QPoint,Signal,QSize,QEvent
 import CustomWidgets
 import os
+from Utils import resource_path
 
 class PlayerTab(QWidget):
     search_requested=Signal(str,int)
@@ -18,6 +19,9 @@ class PlayerTab(QWidget):
     added_playlist=Signal(str,dict)
     download_requested=Signal(dict)
     play_queue_song=Signal(list,int)
+    queue_reordered=Signal(list)
+    remove_queue=Signal()
+
 
     def __init__(self):
         super().__init__()
@@ -184,7 +188,12 @@ class PlayerTab(QWidget):
         
         self.queue_list=QListWidget(self)
         self.queue_list.setIconSize(QSize(60,60))
+        self.queue_list.setDragDropMode(QAbstractItemView.InternalMove)
+        self.queue_list.model().rowsMoved.connect(self.reorder_queue)
         self.queue_list.itemClicked.connect(self.play_playlist_song_at)
+        self.queue_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.queue_list.customContextMenuRequested.connect(self.context_menu_queue)
+
 
         self.vertical_queue_layout.addWidget(self.queue_list)
        
@@ -195,7 +204,7 @@ class PlayerTab(QWidget):
         
         
     def program_location(self,asset_name):
-        return os.path.join(self.location,"Assets",asset_name)
+        return resource_path(os.path.join("Assets",asset_name))
 
 
     def click_search(self):
@@ -338,7 +347,9 @@ class PlayerTab(QWidget):
                     playlist_to_select=add_song_playlist.addAction(playlist["title"])
                     playlist_to_select.triggered.connect(lambda checked=False, p=playlist["playlistId"], s=song_data: self.added_playlist.emit(p,s))                
                 menu_pos=self.search_list.mapToGlobal(pos)
+                self.hide_list_timer.stop()
                 menu.exec(menu_pos)
+                self.search_list.hide()
                             
     
     def update_playlist(self,new_playlist):
@@ -356,23 +367,12 @@ class PlayerTab(QWidget):
         
     def hide_list(self):
         self.search_list.setVisible(False)
+        
 
     def eventFilter(self, obj, event):
         if obj == self.search_box and event.type() == QEvent.FocusOut:
             self.hide_list_timer.start(100)
-        elif obj == self.download_song:
-            if event.type() == QEvent.Enter:
-                # En lugar de ocultar el botón (que mueve el layout), 
-                # quitamos el texto y mostramos la barra.
-                self.download_song.setText("") 
-                self.download_progress.setVisible(True)
-            elif event.type() == QEvent.Leave:
-                # Volvemos el texto y ocultamos la barra.
-                self.download_song.setText("Download Song")
-                self.download_progress.setVisible(False)
-            elif event.type() == QEvent.Resize:
-                # Ajusta el tamaño de la barra al tamaño del botón
-                self.download_progress.setGeometry(0, 0, self.download_song.width(), self.download_song.height())
+
         return super().eventFilter(obj, event)
     
 
@@ -406,7 +406,30 @@ class PlayerTab(QWidget):
                 for i in range(self.queue_list.count())]
         start_index = self.queue_list.row(item)
         self.play_queue_song.emit(songs,start_index)
+    
+    def reorder_queue(self,*args):
+        songs_new_order = [self.queue_list.item(i).data(Qt.UserRole)
+            for i in range(self.queue_list.count())]
+        self.queue_reordered.emit(songs_new_order)
 
+    def context_menu_queue(self,pos):
+        selected_song=self.queue_list.itemAt(pos)
+        if selected_song:
+            song_data=selected_song.data(Qt.UserRole)
+            menu=QMenu()
+            play_next_action=menu.addAction("Play Next")
+            play_next_action.triggered.connect(lambda: self.play_next_requested.emit(song_data))
+            add_song_playlist=menu.addMenu("Add to playlist")
+            download_selected_song=menu.addAction("Download")
+            download_selected_song.triggered.connect(lambda:(self.download_requested.emit(song_data)))
+            remove_song=menu.addAction("Remove from Queue")
+            remove_song.triggered.connect(lambda: (self.remove_queue.emit(self.queue_list.row(selected_song))))
+            for playlist in self.available_playlists:
+                playlist_to_select=add_song_playlist.addAction(playlist["title"])
+                playlist_to_select.triggered.connect(lambda checked=False, p=playlist["playlistId"], s=song_data: self.added_playlist.emit(p,s))                
+            menu_pos=self.queue_list.mapToGlobal(pos)
+            self.hide_list_timer.stop()
+            menu.exec(menu_pos)
 
 
     

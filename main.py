@@ -1,30 +1,41 @@
 import json
+import ctypes
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout,QTabWidget,QMessageBox,QDialog,QFileDialog
 from PySide6.QtGui import QIcon, QPixmap
-from PySide6.QtCore import Qt,QTimer,Qt,Signal,QObject,QSettings
+from PySide6.QtCore import QCoreApplication, QStandardPaths, Qt,QTimer,Qt,Signal,QObject,QSettings
 import PlayerTab,LibraryTab,Network,Motor,Queue,Player,sys,Login,DownloadTab,DownloadQueue
 import threading
 import os
 from yt_dlp.utils import DownloadCancelled
+from Utils import resource_path
 
-                
+try:
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("reprobabb.app.v1")
+except Exception as e:
+    print("Error AppUserModelID:", e)       
 class MainWindow(QObject):
     fetched_playlist=Signal(bool,list)
     search_completed=Signal(object)
     progress_signal=Signal(dict)
-    # En __init__ de MainWindow, añade una señal nueva:
     similar_songs_fetched = Signal(list)
+    
     def __init__(self):
         super().__init__()
-        self.app=QApplication([])
+        self.app=QApplication(sys.argv)
         self.window=QWidget()
         self.window.setWindowTitle("ReproBabb")
         #self.window.setMaximumSize(300,400)
-        self.window.setWindowIcon(QIcon(os.path.join(os.path.dirname(__file__),"Assets","Reprobabb.png")))
-        styles_file=open(os.path.join(os.path.dirname(__file__),"Styles","styles.Qss"),"r")
+        icon_path = resource_path("Assets/ReproBabb.ico")
+        app_icon = QIcon(icon_path)
+        self.window.setWindowIcon(app_icon)
+        self.app.setWindowIcon(app_icon)
+
+        styles_file=open(resource_path("Styles/styles.qss"),"r")
         with styles_file  as styles:
             self.app.setStyleSheet(styles.read())
         self.settings=QSettings("Reprobabb","Reprobabb")
+        QCoreApplication.setOrganizationName("Reprobabb")
+        QCoreApplication.setApplicationName("Reprobabb")
         
         self.tab=QTabWidget()
         self.song_timer=QTimer()
@@ -39,9 +50,10 @@ class MainWindow(QObject):
         self.fetched_playlist.connect(self.on_playlist_fetched)
         # En __init__, conéctala (fuera del constructor, junto a las demás conexiones):
         
-        self.always_on_toggle(False)
-        
         self.player_tab=PlayerTab.PlayerTab()
+        always_on = self.settings.value("always_on", False, type=bool)
+        self.player_tab.visible.setChecked(always_on)
+        self.window.setWindowFlag(Qt.WindowStaysOnTopHint, always_on)
         self.visualizer=self.player_tab.visualizer
         self.volume_slider=self.player_tab.volume_slider
         self.library_tab=LibraryTab.LibraryTab()
@@ -64,6 +76,7 @@ class MainWindow(QObject):
         self.player_tab.search_requested.connect(self.search)
         self.player_tab.added_playlist.connect(self.add_song_playlist)
         self.player_tab.download_requested.connect(self.download)
+        self.player_tab.queue_reordered.connect(self.queue.reorder_queue)
         
         self.player_tab.always_on_toggle.connect(self.always_on_toggle)
         self.tab.addTab(self.player_tab,"Reproducer")
@@ -100,6 +113,8 @@ class MainWindow(QObject):
         self.try_auto_login()
         self.app.aboutToQuit.connect(lambda: self.thumbnail.download_list_thumbnail_executor.shutdown(wait=False, cancel_futures=True))
         self.window.show()
+        self.window.setWindowIcon(app_icon)
+        self.app.setWindowIcon(app_icon)
 
     def search(self,search,search_ver):
         
@@ -113,6 +128,7 @@ class MainWindow(QObject):
             self.search_completed.emit(res)
 
     def always_on_toggle(self,display):
+        self.settings.setValue("always_on", display)
         self.window.setWindowFlag(Qt.WindowStaysOnTopHint, display)
         self.window.show()
 
@@ -238,7 +254,9 @@ class MainWindow(QObject):
     def create_browser(self):
         login_dialog=Login.LoginDialog()
         if login_dialog.exec() == QDialog.Accepted:
-            file_path = os.path.abspath("browser.json")
+            app_path=QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
+            os.makedirs(app_path, exist_ok=True)
+            file_path = os.path.join(app_path, "browser.json")
             try:
                 with open(file_path, "w", encoding="utf-8") as f:
                     json.dump(login_dialog.headers_dict, f, indent=4)
