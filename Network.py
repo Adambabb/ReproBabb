@@ -17,6 +17,9 @@ class ThumbnailFetcher(QObject):
             self._queue = queue
             self._queue.song_data.connect(self.download_thumbnail)
             self.download_list_thumbnail_executor=ThreadPoolExecutor(max_workers=5)
+            self._list_thumbnail_lock = threading.Lock()
+            self._list_thumbnail_loaded = set()
+            self._list_thumbnail_pending = set()
 
     
     def download_thumbnail(self,song):
@@ -35,18 +38,29 @@ class ThumbnailFetcher(QObject):
             print("Error fetching thumbnail:", e)
             
     def download_list_thumbnail(self,song):
-            if song.get("thumbnails"):
+            song_id = song.get("id")
+            if song_id and song.get("thumbnails"):
+                with self._list_thumbnail_lock:
+                    if song_id in self._list_thumbnail_loaded or song_id in self._list_thumbnail_pending:
+                        return
+                    self._list_thumbnail_pending.add(song_id)
                 self.download_list_thumbnail_executor.submit(self.list_thumbnail,song)
     
     def list_thumbnail(self,song):
+        song_id = song.get("id")
         try:
             url=song["thumbnails"][-1]["url"]
             url = url.replace("=w60-h60", "=w60-h60").replace("=w120-h120", "=w60-h60")
             with urllib.request.urlopen(url, timeout=5) as response:
                 data=response.read()
-                self.list_thumbnail_changed.emit(data,song["id"])
+            with self._list_thumbnail_lock:
+                self._list_thumbnail_loaded.add(song_id)
+            self.list_thumbnail_changed.emit(data,song_id)
         except Exception as e:
             print("Error fetching thumbnail:", e)
+        finally:
+            with self._list_thumbnail_lock:
+                self._list_thumbnail_pending.discard(song_id)
             
     def download_playlist_thumbnail(self,playlist):
         if playlist.get("thumbnails"):

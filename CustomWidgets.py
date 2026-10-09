@@ -1,6 +1,7 @@
-from PySide6.QtCore import Signal,QPointF,QTimer,Qt
-from PySide6.QtWidgets import QWidget,QLabel,QHBoxLayout,QSlider,QFrame,QVBoxLayout
-from PySide6.QtGui import QPainter,QColor,QShortcut,QKeySequence,QPixmap
+from PySide6.QtCore import QSize, Signal,QPointF,QTimer,Qt,QRect
+from PySide6.QtWidgets import QWidget,QLabel,QHBoxLayout,QSlider,QFrame,QVBoxLayout,QStyledItemDelegate, QStyle
+from PySide6.QtGui import QPainter,QColor,QShortcut,QKeySequence,QPixmap,QFont, QFontMetrics, QPen
+
 
 import random
 
@@ -187,3 +188,70 @@ def queue(song,artists):
     queue_list_song_layout.addWidget(queue_list_song_artist)
     queue_list_song.setLayout(queue_list_song_layout)
     return queue_list_song
+
+class SongItemDelegate(QStyledItemDelegate):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def paint(self, painter, option, index):
+        painter.save()
+        
+        if option.state & QStyle.State_Selected:
+            painter.fillRect(option.rect, option.palette.highlight())
+        elif option.state & QStyle.State_MouseOver:
+            hover_color = option.palette.color(option.palette.ColorRole.Highlight)
+            hover_color.setAlpha(40)  
+            painter.fillRect(option.rect, hover_color)
+
+        song = index.data(Qt.UserRole)
+        if not song:
+            painter.restore()
+            return
+
+        title = song.get("title", "")
+        artists = song.get("artists", "")
+        if isinstance(artists, list):
+            artists = ", ".join(a.get("name", "") if isinstance(a, dict) else str(a) for a in artists)
+
+        rect = option.rect
+        margin = 8
+
+        icon = index.data(Qt.DecorationRole)
+        icon_size = 48
+        if icon and not icon.isNull():
+            icon_rect = QRect(rect.left() + margin, rect.top() + (rect.height() - icon_size) // 2, icon_size, icon_size)
+            icon.paint(painter, icon_rect)
+            text_x = icon_rect.right() + margin
+        else:
+            text_x = rect.left() + margin
+
+        font_title = QFont()
+        font_title.setBold(True)
+        painter.setFont(font_title)
+        
+        if option.state & QStyle.State_Selected:
+            painter.setPen(option.palette.highlightedText().color())
+        else:
+            painter.setPen(option.palette.text().color())
+
+        title_rect = QRect(text_x, rect.top() + 6, rect.width() - text_x - margin, 20)
+        metrics = QFontMetrics(font_title)
+        elided_title = metrics.elidedText(title, Qt.ElideRight, title_rect.width())
+        painter.drawText(title_rect, Qt.AlignLeft | Qt.AlignVCenter, elided_title)
+
+        font_artist = QFont()
+        font_artist.setPointSize(9)
+        painter.setFont(font_artist)
+        
+        if not (option.state & QStyle.State_Selected):
+            painter.setPen(QColor(160, 160, 160))
+
+        artist_rect = QRect(text_x, title_rect.bottom() + 2, rect.width() - text_x - margin, 18)
+        metrics_artist = QFontMetrics(font_artist)
+        elided_artist = metrics_artist.elidedText(artists, Qt.ElideRight, artist_rect.width())
+        painter.drawText(artist_rect, Qt.AlignLeft | Qt.AlignVCenter, elided_artist)
+
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        return QSize(0, 56)
