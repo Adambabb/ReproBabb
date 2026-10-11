@@ -14,7 +14,7 @@ class LibraryController(QObject):
         super().__init__()
         self.settings = settings
         self.library_tab = library_tab
-        self.player_tab = player_tab  # 🟢 Necesario para actualizar el menú "Add to Playlist"
+        self.player_tab = player_tab
         self.thumbnail_fetcher = thumbnail_fetcher
         self.window = window
 
@@ -30,7 +30,7 @@ class LibraryController(QObject):
             self.settings.setValue("saved_session_path", file_path)
             success = True
             playlists = Motor.get_user_playlist()
-            self.player_tab.update_playlist(playlists)  # 🟢 Actualiza el menú "Add to Playlist"
+            self.player_tab.update_playlist(playlists)
             for pl in playlists:
                 self.thumbnail_fetcher.download_playlist_thumbnail(pl)
         elif show_error:

@@ -85,6 +85,8 @@ python main.py
 | `Space` | Play / Pause |
 | `←` / `→` | Previous track / Next track |
 | `↑` / `↓` | Volume Up / Volume Down |
+| `media_play_pause` (mouse side button) | Play / Pause |
+| `media_next` (mouse side button) | Next track |
 
 ---
 

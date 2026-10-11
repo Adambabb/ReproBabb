@@ -117,7 +117,7 @@ class VolumeDesign(QWidget):
         self.volume_layout.addWidget(self.volume_label)
         self.volume_slider.setMaximum(100)
         self.volume_slider.setMinimum(0)
-        self.volume_slider.setValue(50)
+        self.volume_slider.setValue(100)
         self.volume_slider.setVisible(False)
         self.volume_slider.valueChanged.connect(self.volume_changed.emit)
         self.color=QColor()

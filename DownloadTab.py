@@ -45,7 +45,6 @@ class DownloadModel(QAbstractListModel):
                     model_idx = self.index(idx)
                     self.dataChanged.emit(model_idx, model_idx, [Qt.UserRole])
 
-            # Detectar cuál se está descargando actualmente
             if current_status == "downloading" and d_id in self.downloads_index_map:
                 active_download_index = self.downloads_index_map[d_id]
 
@@ -197,7 +196,6 @@ class DownloadTab(QWidget):
 
     def refresh_downloads(self, data):
         active_row = self.model.refresh_data(data)
-        # Si hay una descarga en progreso y no está completamente visible, desliza la lista suavemente
         if active_row >= 0:
             idx = self.model.index(active_row)
             self.download_list.scrollTo(idx, QAbstractItemView.EnsureVisible)

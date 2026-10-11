@@ -8,6 +8,7 @@ from Utils import resource_path
 class PlayerTab(QWidget):
     search_requested = Signal(str, int)
     play_requested = Signal(list)
+    mini_player_requested = Signal()
     play_pause_toggled = Signal()
     next_requested = Signal()
     play_next_requested = Signal(dict)
@@ -18,6 +19,7 @@ class PlayerTab(QWidget):
     always_on_toggle = Signal(bool)
     added_playlist = Signal(str, dict)
     download_requested = Signal(dict)
+    remove_from_playlist_requested = Signal(dict)
     play_queue_song = Signal(list, int)
     queue_reordered = Signal(list)
     remove_queue = Signal(int)
@@ -72,6 +74,15 @@ class PlayerTab(QWidget):
         self.thumbnail_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.cover = QPixmap(self.program_location("Vinyl-Cover.png"))
         self.thumbnail_label.setPixmap(self.cover)
+        self._song_thumbnail_cache = {}
+        self.add_to_playlist_button = QPushButton("+")
+        self.add_to_playlist_button.setToolTip("Add current song to playlist")
+        self.add_to_playlist_button.setAccessibleName("Add current song to playlist")
+        self.add_to_playlist_button.setFixedSize(30, 30)
+        self.add_to_playlist_button.setEnabled(False)
+        self.add_to_playlist_button.clicked.connect(
+            self.show_current_song_playlist_menu
+        )
 
         self.cover_color = QColor()
         self.thumbnail_label.setMinimumSize(100, 100)
@@ -114,7 +125,10 @@ class PlayerTab(QWidget):
         self.visualizer.time_changed.connect(self.update_current_time_new_slider)
 
         self.volume_slider = CustomWidgets.VolumeDesign(self.program_location("Volume.png"))
-        vertical_layout.addWidget(self.volume_slider, 1)
+        volume_layout = QHBoxLayout()
+        volume_layout.addWidget(self.volume_slider, 1)
+        volume_layout.addWidget(self.add_to_playlist_button)
+        vertical_layout.addLayout(volume_layout, 1)
         self.volume_slider.volume_changed.connect(self.volume_changed.emit)
         self.status_label = QLabel("")
         vertical_layout.addWidget(self.status_label)
@@ -147,6 +161,10 @@ class PlayerTab(QWidget):
         self.shuffle_button.setIcon(QIcon(self.program_location("Shuffle.png")))
         self.shuffle_button.clicked.connect(self.shuffle)
         controllers_layout.addWidget(self.shuffle_button)
+
+        mini_player_button = QPushButton("Mini Player")
+        mini_player_button.clicked.connect(self.mini_player_requested.emit)
+        controllers_layout.addWidget(mini_player_button)
                 
         vertical_layout.addLayout(controllers_layout, 1)
         self.is_link_search = False
@@ -159,7 +177,7 @@ class PlayerTab(QWidget):
         self.visible.toggled.connect(self.always_on_toggle.emit)
         
         self.general_layout = QHBoxLayout()
-        self.general_layout.addLayout(vertical_layout)
+        self.general_layout.addLayout(vertical_layout, 3)
         
         self.vertical_queue_layout = QVBoxLayout()
         self.vertical_queue_layout.addLayout(search_settings_layout)
@@ -179,8 +197,10 @@ class PlayerTab(QWidget):
         self.queue_list.customContextMenuRequested.connect(self.context_menu_queue)
 
         self.vertical_queue_layout.addWidget(self.queue_list)
-        self.general_layout.addLayout(self.vertical_queue_layout)
+        self.general_layout.addLayout(self.vertical_queue_layout, 2)
         self.setLayout(self.general_layout)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.queue_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     def program_location(self, asset_name):
         return resource_path(os.path.join("Assets", asset_name))
@@ -237,11 +257,23 @@ class PlayerTab(QWidget):
     def settings_menu(self):
         self.settings.exec(self.mapToGlobal(QPoint(self.width() // 2 - self.settings.sizeHint().width() // 2, self.height() // 2 - self.settings.sizeHint().height() // 2)))
 
-    def update_thumbnail(self, data):
-        self.cover = QPixmap()
-        self.cover.loadFromData(data)
-        if self.cover.isNull():
-            self.cover = QPixmap(self.program_location("Vinyl-Cover.png")) 
+    def update_thumbnail(self, data, song_id=None):
+        current_song_id = self.actual_song.get("id") or self.actual_song.get("videoId")
+        if current_song_id is not None:
+            current_song_id = str(current_song_id)
+        if song_id:
+            song_id = str(song_id)
+            self._song_thumbnail_cache[song_id] = data
+        if song_id and song_id != current_song_id:
+            return
+
+        cover = QPixmap()
+        if not cover.loadFromData(data):
+            return
+        self._apply_cover(cover)
+
+    def _apply_cover(self, cover):
+        self.cover = cover
         self.thumbnail_label.setPixmap(self.cover)
         cover_scaled = self.cover.toImage().scaled(1, 1)
         self.cover_color = cover_scaled.pixelColor(0, 0)
@@ -254,8 +286,6 @@ class PlayerTab(QWidget):
             self.search_list.raise_()
         self.visualizer.update()
 
-    # En PlayerTab.py
-
     def update_title_artist(self, song):
         self.actual_song = song
         title = song.get("title", "Unknown Title")
@@ -264,18 +294,27 @@ class PlayerTab(QWidget):
             artists = ", ".join(a.get("name", "") if isinstance(a, dict) else str(a) for a in artists)
         self.actual_song_title.setText(title)
         self.actual_song_artist.setText(str(artists))
+        song_id = song.get("id") or song.get("videoId")
+        if song_id is not None:
+            song_id = str(song_id)
+        if song_id in self._song_thumbnail_cache:
+            self.update_thumbnail(self._song_thumbnail_cache[song_id], song_id)
+        else:
+            self._apply_cover(
+                QPixmap(self.program_location("Vinyl-Cover.png"))
+            )
+        self.add_to_playlist_button.setEnabled(
+            bool(song.get("id") and self.available_playlists)
+        )
 
-        # 🟢 [NUEVO] Scroll inteligente a la canción que acaba de sonar en la cola
         if self.queue_list.model():
             songs_list = self.queue_list.model().songs_list
             song_id = song.get("id") or song.get("videoId")
             
-            # Buscamos la posición de la canción sonando en el modelo
             for row, item in enumerate(songs_list):
                 item_id = item.get("id") or item.get("videoId")
                 if item_id and item_id == song_id:
                     idx = self.queue_list.model().index(row)
-                    # EnsureVisible desplaza la vista suavemente solo si la canción no se ve
                     self.queue_list.scrollTo(idx, QAbstractItemView.EnsureVisible)
                     break
 
@@ -330,7 +369,36 @@ class PlayerTab(QWidget):
             self.search_list.hide()
 
     def update_playlist(self, new_playlist):
-        self.available_playlists = new_playlist
+        self.available_playlists = new_playlist or []
+        self.add_to_playlist_button.setEnabled(
+            bool(self.actual_song.get("id") and self.available_playlists)
+        )
+
+    def show_current_song_playlist_menu(self):
+        if not self.actual_song.get("id") or not self.available_playlists:
+            return
+
+        menu = self._create_playlist_menu(self.actual_song)
+        if menu.isEmpty():
+            return
+        menu.exec(
+            self.add_to_playlist_button.mapToGlobal(
+                self.add_to_playlist_button.rect().bottomLeft()
+            )
+        )
+
+    def _create_playlist_menu(self, song):
+        menu = QMenu(self)
+        for playlist in self.available_playlists:
+            playlist_id = playlist.get("playlistId")
+            if not playlist_id:
+                continue
+            action = menu.addAction(playlist.get("title", "Untitled Playlist"))
+            action.triggered.connect(
+                lambda checked=False, target=playlist_id, current_song=song:
+                self.added_playlist.emit(target, current_song)
+            )
+        return menu
 
     def update_current_time_new_slider(self, new_time):
         self.time_changed.emit(new_time)
@@ -354,19 +422,25 @@ class PlayerTab(QWidget):
         thumbnail_id = song.get("videoId") or song.get("id") if isinstance(song, dict) else None
         if not thumbnail_id:
             return
+        thumbnail_id = str(thumbnail_id)
         self._thumbnail_items[list_name].setdefault(thumbnail_id, []).append(item)
         icon = self._thumbnail_cache.get(thumbnail_id)
         if icon:
             item.setIcon(icon)
 
     def set_list_thumbnail(self, image, thumbnail_id):
+        thumbnail_id = str(thumbnail_id)
         pixmap = QPixmap()
         pixmap.loadFromData(image)
         icon = QIcon(pixmap)
         self._thumbnail_cache[thumbnail_id] = icon
+        self._song_thumbnail_cache[thumbnail_id] = image
         for item_group in self._thumbnail_items.values():
             for item in item_group.get(thumbnail_id, []):
                 item.setIcon(icon)
+        current_song_id = self.actual_song.get("id") or self.actual_song.get("videoId")
+        if current_song_id is not None and str(current_song_id) == thumbnail_id:
+            self.update_thumbnail(image, thumbnail_id)
 
     def on_queue_item_clicked(self, index):
         if not index.isValid() or not self.queue_list.model():
@@ -386,6 +460,11 @@ class PlayerTab(QWidget):
             download_selected_song.triggered.connect(lambda: self.download_requested.emit(song_data))
             remove_song = menu.addAction("Remove from Queue")
             remove_song.triggered.connect(lambda: self.remove_queue.emit(index.row()))
+            remove_from_playlist = menu.addAction("Remove from Current Playlist")
+            remove_from_playlist.triggered.connect(
+                lambda checked=False, song=song_data:
+                self.remove_from_playlist_requested.emit(song)
+            )
             
             for playlist in self.available_playlists:
                 playlist_to_select = add_song_playlist.addAction(playlist["title"])

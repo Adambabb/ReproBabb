@@ -87,22 +87,33 @@ def music_data(raw_song):
     if raw_song:
         if "videoDetails" in raw_song:
             videoDetails=raw_song["videoDetails"]
+            thumbnail_data = videoDetails.get("thumbnail", {}).get("thumbnails", [])
             song={
                 "status":"success",
                 "title": videoDetails.get("title",""),
                 "id": videoDetails.get("videoId",""),
                 "duration": int(videoDetails.get("lengthSeconds",0)),
-                "thumbnails": videoDetails.get("thumbnail", {}).get("thumbnails", []),
+                "thumbnails": thumbnail_data if isinstance(thumbnail_data, list) else [],
                 "artists": videoDetails.get("author","")
                 }
             return song
         else:
+            thumbnail_data = raw_song.get("thumbnails") or raw_song.get("thumbnail", [])
+            if isinstance(thumbnail_data, dict):
+                nested_thumbnails = thumbnail_data.get("thumbnails")
+                thumbnail_data = (
+                    nested_thumbnails
+                    if isinstance(nested_thumbnails, list)
+                    else [thumbnail_data] if thumbnail_data.get("url") else []
+                )
+            if not isinstance(thumbnail_data, list):
+                thumbnail_data = []
             song={
                 "status":"success",
                 "title": raw_song.get("title",""),
                 "id": raw_song.get("videoId",""),
                 "duration": int(raw_song.get("duration_seconds",0)),
-                "thumbnails": raw_song.get("thumbnails",[]),
+                "thumbnails": thumbnail_data,
                 "artists": raw_song.get("artists","")
             }
             return song

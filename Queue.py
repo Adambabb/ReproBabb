@@ -34,8 +34,10 @@ class QueueModel(QAbstractListModel):
 
         for song in songs:
             s_id = song.get("videoId") or song.get("id")
-            if s_id and s_id in self._thumbnail_cache:
-                song["_icon"] = self._thumbnail_cache[s_id]
+            if s_id:
+                icon = self._thumbnail_cache.get(str(s_id))
+                if icon:
+                    song["_icon"] = icon
 
     def set_songs(self, songs):
         self.beginResetModel()
@@ -59,10 +61,11 @@ class QueueModel(QAbstractListModel):
         self.endInsertRows()
 
     def update_thumbnail(self, song_id, icon):
+        song_id = str(song_id)
         self._thumbnail_cache[song_id] = icon
         for row, song in enumerate(self.songs_list):
             s_id = song.get("videoId") or song.get("id")
-            if s_id == song_id:
+            if s_id and str(s_id) == song_id:
                 song["_icon"] = icon
                 idx = self.index(row)
                 self.dataChanged.emit(idx, idx, [Qt.DecorationRole])
@@ -146,15 +149,33 @@ class SongQueue(QObject):
         self.model.rows_reordered.connect(self.reorder_queue)
 
     def playing_playlist(self, playlist, start_index=0):
+        self._start_playlist(playlist, start_index, shuffled=False)
+
+    def playing_playlist_shuffled(self, playlist):
+        self._start_playlist(playlist, 0, shuffled=True)
+
+    def _start_playlist(self, playlist, start_index, shuffled):
         song_to_play = None
         with self.lock:
             self.retry_count = 0
-            self.is_shuffle = False
+            self.is_shuffle = shuffled
+            self.songs_list = list(playlist)
             self.current_index = start_index if 0 <= start_index < len(playlist) else 0
-            self.songs_list = playlist
-            self.model.set_songs(self.songs_list)
-            if len(self.songs_list) > 0:
-                song = self.songs_list[self.current_index]
+            if shuffled and self.songs_list:
+                self.shuffle_song_list = list(range(len(self.songs_list)))
+                random.shuffle(self.shuffle_song_list)
+                self.shuffle_current_index = 0
+                self.current_index = self.shuffle_song_list[0]
+                displayed_songs = [
+                    self.songs_list[index] for index in self.shuffle_song_list
+                ]
+            else:
+                self.shuffle_song_list = []
+                self.shuffle_current_index = 0
+                displayed_songs = self.songs_list
+            self.model.set_songs(displayed_songs)
+            if self.songs_list:
+                song = self.get_song_index()
                 song_to_play = song
         if song_to_play is not None:
             fetch_thread = threading.Thread(target=self.fetch_song, daemon=True, args=(song_to_play,))
@@ -236,7 +257,6 @@ class SongQueue(QObject):
                     self.shuffle_current_index = 0
                     return
                 
-                # Si hay una canción sonando válidamente, se fija en la posición 0
                 if 0 <= self.current_index < len(self.songs_list):
                     other_indices = [i for i in range(len(self.songs_list)) if i != self.current_index]
                     random.shuffle(other_indices)
@@ -279,32 +299,45 @@ class SongQueue(QObject):
     def add_to_queue(self, song):
         with self.lock:
             if self.is_shuffle:
-                insert_index = self.shuffle_current_index + 1
+                insert_index = min(
+                    self.shuffle_current_index + 1, len(self.shuffle_song_list)
+                )
                 self.songs_list.append(song)
                 new_song_index = len(self.songs_list) - 1
                 self.shuffle_song_list.insert(insert_index, new_song_index)
             else:
-                insert_index = self.current_index + 1
+                insert_index = min(self.current_index + 1, len(self.songs_list))
                 self.songs_list.insert(insert_index, song)
             
             self.model.insert_songs(insert_index, [song])
                 
     def add_multiple_to_queue(self, songs):
+        if not songs:
+            return
+
         with self.lock:
             if self.is_shuffle:
-                insert_index = self.shuffle_current_index + 1
+                insert_index = min(
+                    self.shuffle_current_index + 1, len(self.shuffle_song_list)
+                )
                 for song in songs:
                     self.songs_list.append(song)
                     new_song_index = len(self.songs_list) - 1
                     self.shuffle_song_list.insert(insert_index, new_song_index)
                     insert_index += 1
+                model_insert_index = min(
+                    self.shuffle_current_index + 1,
+                    self.model.rowCount(),
+                )
             else:
-                insert_index = self.current_index + 1
-                for song in songs:
-                    self.songs_list.insert(insert_index, song)
-                    insert_index += 1
-            
-            self.model.insert_songs(insert_index, songs)
+                model_insert_index = min(
+                    self.current_index + 1,
+                    len(self.songs_list),
+                )
+                for offset, song in enumerate(songs):
+                    self.songs_list.insert(model_insert_index + offset, song)
+
+            self.model.insert_songs(model_insert_index, songs)
 
     def reorder_queue(self, new_order):
         with self.lock:

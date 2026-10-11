@@ -20,7 +20,6 @@ class SearchController(QObject):
 
     def _run_search(self, query, search_version):
         res = Motor.search_bar(query)
-        # Comprobar la versión de búsqueda para evitar resultados obsoletos
         if search_version == self.player_tab.search_version:
             self.search_completed.emit(res)
 
@@ -42,4 +41,7 @@ class SearchController(QObject):
 
     def _run_similar_songs(self, video_id):
         songs = Motor.get_similar_songs(video_id)
+        for song in songs:
+            if isinstance(song, dict):
+                self.thumbnail_fetcher.download_list_thumbnail(song)
         self.similar_songs_fetched.emit(songs)

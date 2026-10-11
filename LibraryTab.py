@@ -1,13 +1,17 @@
 from PySide6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QLineEdit, QListWidget, 
                              QListWidgetItem, QPushButton, QLabel, QFileDialog, QMenu, 
                              QListView, QAbstractItemView)
-from PySide6.QtCore import Signal, QSize, Qt, QAbstractListModel, QModelIndex
+from PySide6.QtCore import (
+    Signal,
+    QSize,
+    Qt,
+    QAbstractListModel,
+    QModelIndex,
+    QSortFilterProxyModel,
+)
 from PySide6.QtGui import QIcon, QPixmap
 import CustomWidgets
 
-# ==============================================================================
-# MODELO VIRTUAL LIGERO PARA LAS CANCIONES DE LA PLAYLIST
-# ==============================================================================
 class PlaylistSongsModel(QAbstractListModel):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -32,7 +36,6 @@ class PlaylistSongsModel(QAbstractListModel):
     def set_songs(self, songs):
         self.beginResetModel()
         self.songs_list = list(songs)
-        # Aplicar carátulas guardadas en caché
         for song in self.songs_list:
             s_id = song.get("videoId") or song.get("id")
             if s_id and s_id in self._thumbnail_cache:
@@ -49,14 +52,44 @@ class PlaylistSongsModel(QAbstractListModel):
                 self.dataChanged.emit(idx, idx, [Qt.DecorationRole])
 
 
-# ==============================================================================
-# PESTAÑA BIBLIOTECA CON QLISTVIEW OPTIMIZADO
-# ==============================================================================
+class PlaylistSongsFilterModel(QSortFilterProxyModel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.search_text = ""
+
+    def set_search_text(self, text):
+        self.search_text = text.casefold().strip()
+        self.invalidateFilter()
+
+    def filterAcceptsRow(self, source_row, source_parent):
+        if not self.search_text:
+            return True
+
+        source_model = self.sourceModel()
+        if source_model is None:
+            return False
+
+        song = source_model.index(source_row, 0, source_parent).data(Qt.UserRole)
+        if not isinstance(song, dict):
+            return False
+
+        title = str(song.get("title", ""))
+        artists = song.get("artists", "")
+        if isinstance(artists, list):
+            artists = ", ".join(
+                artist.get("name", "") if isinstance(artist, dict) else str(artist)
+                for artist in artists
+            )
+        searchable_text = f"{title} {artists}".casefold()
+        return self.search_text in searchable_text
+
+
 class LibraryTab(QWidget):
     load_account_requested = Signal(str, bool)
     create_browser_requested = Signal()
     playlist_content_selected = Signal(dict)
     playlist_play_requested = Signal(list, int)
+    playlist_play_shuffled_requested = Signal(list)
     song_playlist_delete = Signal(str, dict)
     playlist_download_requested = Signal(list, str)
 
@@ -85,28 +118,43 @@ class LibraryTab(QWidget):
         self.download_playlist_button = QPushButton("Download Playlist")
         self.download_playlist_button.clicked.connect(self.download_playlist)
         self.library_vlayout.addWidget(self.download_playlist_button)
+        self.play_shuffled_button = QPushButton("Play Shuffled")
+        self.play_shuffled_button.setEnabled(False)
+        self.play_shuffled_button.clicked.connect(self.play_playlist_shuffled)
+        self.library_vlayout.addWidget(self.play_shuffled_button)
         self.library_vlayout.addStretch()
 
-        # Lista de Playlists del usuario (se mantiene QListWidget)
         self.user_playlists = QListWidget()
         self.user_playlists.setObjectName("library_list")
         self.user_playlists.setIconSize(QSize(50, 50))
         self.user_playlists.itemClicked.connect(self.select_user_playlist)
 
-        # Vista Virtualizada QListView para las Canciones de la Playlist
         self.user_playlists_songs = QListView(self)
         self.user_playlists_songs.setItemDelegate(CustomWidgets.SongItemDelegate(self.user_playlists_songs))
         self.user_playlists_songs.setSelectionMode(QAbstractItemView.SingleSelection)
         
         self.playlist_songs_model = PlaylistSongsModel()
-        self.user_playlists_songs.setModel(self.playlist_songs_model)
+        self.playlist_songs_filter_model = PlaylistSongsFilterModel(self)
+        self.playlist_songs_filter_model.setSourceModel(self.playlist_songs_model)
+        self.user_playlists_songs.setModel(self.playlist_songs_filter_model)
         
         self.user_playlists_songs.clicked.connect(self.play_playlist_song_at)
         self.user_playlists_songs.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.user_playlists_songs.customContextMenuRequested.connect(self.playlist_context_menu)
 
+        self.playlist_search_box = QLineEdit()
+        self.playlist_search_box.setPlaceholderText("Search songs in this playlist...")
+        self.playlist_search_box.setClearButtonEnabled(True)
+        self.playlist_search_box.setEnabled(False)
+        self.playlist_search_box.textChanged.connect(
+            self.playlist_songs_filter_model.set_search_text
+        )
+
+        self.playlist_songs_panel = QVBoxLayout()
+        self.playlist_songs_panel.addWidget(self.playlist_search_box)
+        self.playlist_songs_panel.addWidget(self.user_playlists_songs)
         self.playlists_songs.addWidget(self.user_playlists)
-        self.playlists_songs.addWidget(self.user_playlists_songs)
+        self.playlists_songs.addLayout(self.playlist_songs_panel, 1)
         self.library_vlayout.addLayout(self.playlists_songs, 1)
         self.setLayout(self.library_vlayout)
         
@@ -122,13 +170,18 @@ class LibraryTab(QWidget):
     def select_user_playlist(self, item):
         playlist = item.data(Qt.UserRole)
         self.current_playlist = playlist
+        self.playlist_search_box.clear()
+        self.playlist_search_box.setEnabled(True)
+        self.play_shuffled_button.setEnabled(False)
+        self.playlist_songs_model.set_songs([])
         self.playlist_content_selected.emit(playlist)
     
     def play_playlist_song_at(self, index):
         if not index.isValid():
             return
+        source_index = self.playlist_songs_filter_model.mapToSource(index)
         songs = self.playlist_songs_model.songs_list
-        start_index = index.row()
+        start_index = source_index.row()
         self.playlist_play_requested.emit(songs, start_index)
     
     def display_playlists(self, playlist, file_path, succes):
@@ -145,11 +198,42 @@ class LibraryTab(QWidget):
         else:
             self.browser_route.clear()
             self.sesion_status.setText("State: Error with account")
+            self.current_playlist = None
+            self.playlist_search_box.clear()
+            self.playlist_search_box.setEnabled(False)
+            self.playlist_songs_model.set_songs([])
     
     def display_playlist_songs(self, playlist_status, playlist_data):
         if playlist_status:
-            # Carga instantánea de todas las canciones en el modelo
             self.playlist_songs_model.set_songs(playlist_data)
+            self.play_shuffled_button.setEnabled(bool(playlist_data))
+        else:
+            self.playlist_songs_model.set_songs([])
+            self.play_shuffled_button.setEnabled(False)
+
+    def play_playlist_shuffled(self):
+        songs = self.playlist_songs_model.songs_list
+        if songs:
+            self.playlist_play_shuffled_requested.emit(songs)
+
+    def remove_queue_song_from_current_playlist(self, song):
+        if not self.current_playlist:
+            return
+
+        target_id = song.get("videoId") or song.get("id")
+        if not target_id:
+            return
+
+        for playlist_song in self.playlist_songs_model.songs_list:
+            playlist_song_id = playlist_song.get("videoId") or playlist_song.get("id")
+            if playlist_song_id == target_id:
+                song_to_remove = dict(playlist_song)
+                song_to_remove.setdefault("id", playlist_song_id)
+                self.song_playlist_delete.emit(
+                    self.current_playlist.get("playlistId", ""),
+                    song_to_remove,
+                )
+                return
 
     def _index_thumbnail_item(self, item, data, id_key, list_name):
         thumbnail_id = data.get(id_key)
@@ -168,7 +252,6 @@ class LibraryTab(QWidget):
         for item_group in self._thumbnail_items.values():
             for item in item_group.get(thumbnail_id, []):
                 item.setIcon(icon)
-        # Actualizar también el modelo de la playlist
         self.playlist_songs_model.update_thumbnail(thumbnail_id, icon)
     
     def playlist_context_menu(self, pos):

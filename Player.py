@@ -22,7 +22,7 @@ class AudioController(QObject):
         super().__init__()
         self._status = "idle"
         self._has_played=False
-        self._volume=50
+        self._volume=100
         self._instance = vlc.Instance('--no-video', '--quiet')  
         self.player = self._instance.media_player_new()      
         self._event_manager = self.player.event_manager()
