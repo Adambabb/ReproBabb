@@ -1,8 +1,15 @@
 from PySide6.QtCore import QObject,Signal
-import vlc
+try:
+    import vlc
+except Exception as error:
+    vlc = None
+    VLC_IMPORT_ERROR = error
+
+class VlcNotAvailableError(Exception):
+    pass
 
 class AudioController(QObject):
-
+    
     state_changed = Signal(str)
     error_occurred = Signal(str)
     volume_changed = Signal(int)  
@@ -10,6 +17,8 @@ class AudioController(QObject):
     
     
     def __init__(self):
+        if vlc is None:
+            raise VlcNotAvailableError(f"VLC module is not available: {VLC_IMPORT_ERROR}")
         events=[vlc.EventType.MediaPlayerNothingSpecial,
                     vlc.EventType.MediaPlayerOpening,
                     vlc.EventType.MediaPlayerBuffering, 
@@ -22,8 +31,15 @@ class AudioController(QObject):
         super().__init__()
         self._status = "idle"
         self._has_played=False
-        self._volume=50
-        self._instance = vlc.Instance('--no-video', '--quiet')  
+        self._volume=100
+        try:
+            self._instance = vlc.Instance('--no-video', '--quiet')  
+        except Exception as e:
+            raise VlcNotAvailableError(f"Failed to initialize VLC instance: {e}") from e
+        
+        if self._instance is None:
+            raise VlcNotAvailableError("Failed to create VLC instance.")
+            
         self.player = self._instance.media_player_new()      
         self._event_manager = self.player.event_manager()
         for event in events:

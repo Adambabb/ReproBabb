@@ -1,6 +1,8 @@
 import ytmusicapi
 import yt_dlp
 import urllib.parse
+from yt_dlp.utils import DownloadCancelled
+
 
 searcher = ytmusicapi.YTMusic()
 
@@ -85,22 +87,33 @@ def music_data(raw_song):
     if raw_song:
         if "videoDetails" in raw_song:
             videoDetails=raw_song["videoDetails"]
+            thumbnail_data = videoDetails.get("thumbnail", {}).get("thumbnails", [])
             song={
                 "status":"success",
                 "title": videoDetails.get("title",""),
                 "id": videoDetails.get("videoId",""),
                 "duration": int(videoDetails.get("lengthSeconds",0)),
-                "thumbnails": videoDetails.get("thumbnail", {}).get("thumbnails", []),
+                "thumbnails": thumbnail_data if isinstance(thumbnail_data, list) else [],
                 "artists": videoDetails.get("author","")
                 }
             return song
         else:
+            thumbnail_data = raw_song.get("thumbnails") or raw_song.get("thumbnail", [])
+            if isinstance(thumbnail_data, dict):
+                nested_thumbnails = thumbnail_data.get("thumbnails")
+                thumbnail_data = (
+                    nested_thumbnails
+                    if isinstance(nested_thumbnails, list)
+                    else [thumbnail_data] if thumbnail_data.get("url") else []
+                )
+            if not isinstance(thumbnail_data, list):
+                thumbnail_data = []
             song={
                 "status":"success",
                 "title": raw_song.get("title",""),
                 "id": raw_song.get("videoId",""),
                 "duration": int(raw_song.get("duration_seconds",0)),
-                "thumbnails": raw_song.get("thumbnails",[]),
+                "thumbnails": thumbnail_data,
                 "artists": raw_song.get("artists","")
             }
             return song
@@ -166,32 +179,43 @@ fetcher_options = {
     }
 }
     
-def fetch(video_id, download=False, destination=None,progress_hook=None):
-    options=fetcher_options.copy()
+def fetch(video_id, download=False, destination=None, is_cancelled_fn=None, update_progress_fn=None):
+    options = fetcher_options.copy()
     if download:
-        options['outtmpl']=f"{destination}/%(title)s.%(ext)s"
-    if progress_hook:
+        options['outtmpl'] = f"{destination}/%(title)s.%(ext)s"
+
+    if is_cancelled_fn or update_progress_fn:
+        def progress_hook(progress_data):
+            if is_cancelled_fn and is_cancelled_fn():
+                raise DownloadCancelled()
+            
+            if update_progress_fn:
+                status = progress_data.get('status')
+                if status == 'downloading':
+                    downloaded = progress_data.get('downloaded_bytes', 0)
+                    total = progress_data.get('total_bytes', 1) or 1
+                    percentage = int((downloaded / total) * 100)
+                    update_progress_fn(percentage)
+                elif status == 'finished':
+                    update_progress_fn(100)
+
         options['progress_hooks'] = [progress_hook]
+
     with yt_dlp.YoutubeDL(options) as fetcher:
         try:
-            info=fetcher.extract_info(video_id,download)
+            info = fetcher.extract_info(video_id, download)
 
-            if download==False:
-                fetch_result={"url": info["url"],
-                            "status": "success"}
+            if not download:
+                fetch_result = {"url": info["url"], "status": "success"}
             else:
-                    
-                fetch_result={"url":fetcher.prepare_filename(info),
-                            "status": "success"}
+                fetch_result = {"url": fetcher.prepare_filename(info), "status": "success"}
             
             return fetch_result
         except Exception as e:
             error_message = str(e)
-            fetch_result={"error": error_message,
-                         "status": "error"}
+            fetch_result = {"error": error_message, "status": "error"}
             return fetch_result
         
-# DESPUÉS
 def get_similar_songs(video_id):
     try:
         watch_data = searcher.get_watch_playlist(videoId=video_id, limit=25)
@@ -199,7 +223,7 @@ def get_similar_songs(video_id):
         similar_songs = []
         for track in tracks:
             if track.get("videoId") == video_id:
-                continue  # nos saltamos la propia canción
+                continue  
             similar_songs.append(music_data(track))
         return similar_songs
     except Exception as e:

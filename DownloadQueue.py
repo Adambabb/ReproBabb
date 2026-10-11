@@ -24,7 +24,17 @@ class DownloadQueue:
         with self.update_lock:
             if download_id in self.downloads:
                 self.downloads[download_id]["status"] = status
-    
+
+    def start_download(self, download_id):
+        with self.cancelled_lock:
+            if download_id in self.cancelled_downloads:
+                return False
+            with self.update_lock:
+                if download_id not in self.downloads:
+                    return False
+                self.downloads[download_id]["status"] = "downloading"
+                return True
+
     def cancel_download(self, download_id):
         with self.cancelled_lock:
             self.cancelled_downloads.add(download_id)
