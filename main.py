@@ -1,5 +1,5 @@
 import sys
-from PySide6.QtWidgets import QApplication,QTabWidget,QVBoxLayout,QWidget
+from PySide6.QtWidgets import QApplication, QMessageBox,QTabWidget,QVBoxLayout,QWidget
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QSettings, QObject
 from PySide6.QtGui import QGuiApplication
@@ -33,7 +33,11 @@ class MainWindow(QObject):
         with open(resource_path("Styles/styles.qss"), "r") as f:
             self.app.setStyleSheet(f.read())
 
-        self.player = Player.AudioController()
+        try:
+            self.player = Player.AudioController()
+        except Player.VlcNotAvailableError:
+            QMessageBox.critical(self.window, "VLC was not found. ReproBabb needs VLC (64-bit) installed. You can download it from videolan.org.")
+            sys.exit(1)
         self.queue = Queue.SongQueue(self.player)
         self.download_queue = DownloadQueue.DownloadQueue()
         self.thumbnail = Network.ThumbnailFetcher(self.queue)
