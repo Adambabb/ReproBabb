@@ -212,6 +212,20 @@ class MiniPlayer(QWidget):
             self._cover = cover
             self._update_cover()
 
+    def set_list_thumbnail(self, image, song_id):
+        song_id = str(song_id)
+        has_song_cover = song_id in self._song_thumbnail_cache
+        self._song_thumbnail_cache.setdefault(song_id, image)
+        current_song_id = (
+            str(self.current_song_id) if self.current_song_id is not None else None
+        )
+        if has_song_cover or song_id != current_song_id:
+            return
+        cover = QPixmap()
+        if cover.loadFromData(image):
+            self._cover = cover
+            self._update_cover()
+
     def set_playback_state(self, state):
         icon_name = "Pause.png" if state == "Playing" else "Play.png"
         self.play_button.setIcon(

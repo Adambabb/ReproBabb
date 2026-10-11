@@ -1,4 +1,15 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QListView, QMenu, QAbstractItemView, QStyledItemDelegate, QStyle
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QListView,
+    QMenu,
+    QAbstractItemView,
+    QStyledItemDelegate,
+    QStyle,
+    QPushButton,
+    QLabel,
+)
 from PySide6.QtCore import Qt, Signal, QAbstractListModel, QModelIndex, QSize, QRect, QEvent
 from PySide6.QtGui import QPainter, QFont, QFontMetrics, QColor, QPen
 
@@ -174,11 +185,22 @@ class DownloadItemDelegate(QStyledItemDelegate):
 
 class DownloadTab(QWidget):
     cancel_download_requested = Signal(int)
+    download_path_requested = Signal()
 
     def __init__(self):
         super().__init__()
         self.download_vlayout = QVBoxLayout()
         self.setLayout(self.download_vlayout)
+
+        download_path_layout = QHBoxLayout()
+        self.download_path_label = QLabel("Download folder: Not selected")
+        self.download_path_button = QPushButton("Change Download Folder")
+        self.download_path_button.clicked.connect(
+            self.download_path_requested.emit
+        )
+        download_path_layout.addWidget(self.download_path_label, 1)
+        download_path_layout.addWidget(self.download_path_button)
+        self.download_vlayout.addLayout(download_path_layout)
 
         self.download_list = QListView(self)
         self.delegate = DownloadItemDelegate(self.download_list)
@@ -193,6 +215,11 @@ class DownloadTab(QWidget):
         self.download_list.customContextMenuRequested.connect(self.context_menu_downloads)
 
         self.download_vlayout.addWidget(self.download_list)
+
+    def set_download_path(self, path):
+        display_path = path or "Not selected"
+        self.download_path_label.setText(f"Download folder: {display_path}")
+        self.download_path_label.setToolTip(path or "")
 
     def refresh_downloads(self, data):
         active_row = self.model.refresh_data(data)

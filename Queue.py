@@ -229,11 +229,14 @@ class SongQueue(QObject):
             fetch_thread.start()
     
     def fetch_song(self, song):
-        self.fetch_version += 1
-        current_fetch_version = self.fetch_version
+        with self.lock:
+            self.fetch_version += 1
+            current_fetch_version = self.fetch_version
         while song is not None:
             status_fetch = Motor.fetch(song["id"])
-            if current_fetch_version != self.fetch_version:
+            with self.lock:
+                is_current_fetch = current_fetch_version == self.fetch_version
+            if not is_current_fetch:
                 break
             if status_fetch["status"] == "success":
                 url = status_fetch["url"]
@@ -342,12 +345,42 @@ class SongQueue(QObject):
     def reorder_queue(self, new_order):
         with self.lock:
             actual_song_playing = self.get_song_index()
-            self.songs_list = new_order
-            if actual_song_playing:
-                for position, song in enumerate(new_order):
-                    if song.get("id") == actual_song_playing.get("id"):
-                        self.current_index = position
-                        break
+            previous_index = self.current_index
+            previous_shuffle_index = self.shuffle_current_index
+            self.songs_list = list(new_order)
+            current_position = None
+            if actual_song_playing is not None:
+                current_song_id = (
+                    actual_song_playing.get("id")
+                    or actual_song_playing.get("videoId")
+                )
+                current_position = next(
+                    (
+                        position
+                        for position, song in enumerate(self.songs_list)
+                        if song is actual_song_playing
+                        or (
+                            current_song_id
+                            and (song.get("id") or song.get("videoId"))
+                            == current_song_id
+                        )
+                    ),
+                    None,
+                )
+
+            if current_position is not None:
+                self.current_index = current_position
+            else:
+                self.current_index = min(previous_index, len(self.songs_list))
+
+            if self.is_shuffle:
+                self.shuffle_song_list = list(range(len(self.songs_list)))
+                if current_position is not None:
+                    self.shuffle_current_index = current_position
+                else:
+                    self.shuffle_current_index = min(
+                        previous_shuffle_index, len(self.songs_list)
+                    )
     
     def remove_song_at_index(self, index):
         with self.lock:

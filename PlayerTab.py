@@ -431,15 +431,21 @@ class PlayerTab(QWidget):
     def set_list_thumbnail(self, image, thumbnail_id):
         thumbnail_id = str(thumbnail_id)
         pixmap = QPixmap()
-        pixmap.loadFromData(image)
+        if not pixmap.loadFromData(image):
+            return
         icon = QIcon(pixmap)
         self._thumbnail_cache[thumbnail_id] = icon
-        self._song_thumbnail_cache[thumbnail_id] = image
+        has_song_cover = thumbnail_id in self._song_thumbnail_cache
+        self._song_thumbnail_cache.setdefault(thumbnail_id, image)
         for item_group in self._thumbnail_items.values():
             for item in item_group.get(thumbnail_id, []):
                 item.setIcon(icon)
         current_song_id = self.actual_song.get("id") or self.actual_song.get("videoId")
-        if current_song_id is not None and str(current_song_id) == thumbnail_id:
+        if (
+            not has_song_cover
+            and current_song_id is not None
+            and str(current_song_id) == thumbnail_id
+        ):
             self.update_thumbnail(image, thumbnail_id)
 
     def on_queue_item_clicked(self, index):

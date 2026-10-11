@@ -17,8 +17,8 @@ class TimeDesign(QWidget):
         self.bars_height_timer=QTimer()
         self.bars_height_timer.timeout.connect(self.update_heights)
         self.bar_gap=0
-        self.song_duration=0
-        self.song_current_time=0
+        self.song_duration=song_duration
+        self.song_current_time=song_current_time
         self.cover_color=cover_color
         self.cover_color_contrary=cover_color
         self.is_dragging=False

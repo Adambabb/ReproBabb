@@ -72,6 +72,15 @@ class MainWindow(QObject):
         self.download_ctrl = DownloadController(self.settings, self.download_queue, self.window)
         self.library_ctrl = LibraryController(self.settings, self.library_tab, self.player_tab, self.thumbnail, self.window)
         self.search_ctrl = SearchController(self.player_tab, self.thumbnail)
+        self.download_tab.download_path_requested.connect(
+            self.download_ctrl.choose_download_path
+        )
+        self.download_ctrl.download_path_changed.connect(
+            self.download_tab.set_download_path
+        )
+        self.download_tab.set_download_path(
+            self.settings.value("download_path", "")
+        )
 
         self._wire_signals()
 
@@ -212,7 +221,7 @@ class MainWindow(QObject):
         self.queue.model.update_thumbnail(id_key, icon)
         self.library_tab.playlist_songs_model.update_thumbnail(id_key, icon)
         self.player_tab.set_list_thumbnail(image, id_key)
-        self.mini_player.set_thumbnail(image, id_key)
+        self.mini_player.set_list_thumbnail(image, id_key)
         self.library_tab.set_list_thumbnail(image, id_key)
 
 if __name__ == "__main__":

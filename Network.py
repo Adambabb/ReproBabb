@@ -78,7 +78,7 @@ class ThumbnailFetcher(QObject):
             url = self._thumbnail_url(song)
             if not url:
                 return
-            url = url.replace("=w60-h60", "=w60-h60").replace("=w120-h120", "=w60-h60")
+            url = url.replace("=w120-h120", "=w60-h60")
             with urllib.request.urlopen(url, timeout=5) as response:
                 data=response.read()
             with self._list_thumbnail_lock:
