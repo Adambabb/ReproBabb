@@ -423,12 +423,17 @@ class SongQueue(QObject):
                     )
 
     def remove_song_at_index(self, index):
+        song_to_play = None
+        removing_current = False
+
         with self.lock:
             if not (0 <= index < len(self.songs_list)):
                 return
 
             if self.is_shuffle:
                 if index < len(self.shuffle_song_list):
+                    removing_current = index == self.shuffle_current_index
+
                     real_index = self.shuffle_song_list.pop(index)
                     if real_index < len(self.songs_list):
                         self.songs_list.pop(real_index)
@@ -440,11 +445,33 @@ class SongQueue(QObject):
                     if index < self.shuffle_current_index:
                         self.shuffle_current_index -= 1
 
+                    if self.shuffle_current_index < len(self.shuffle_song_list):
+                        self.current_index = self.shuffle_song_list[
+                            self.shuffle_current_index
+                        ]
+                    else:
+                        self.current_index = len(self.songs_list)
+
                     self.model.remove_at(index)
             else:
+                removing_current = index == self.current_index
+
                 self.songs_list.pop(index)
 
                 if index < self.current_index:
                     self.current_index -= 1
 
                 self.model.remove_at(index)
+
+            if removing_current:
+                song_to_play = self.get_song_index()
+                self.retry_count = 0
+
+                if song_to_play is not None:
+                    fetch_thread = threading.Thread(
+                        target=self.fetch_song, daemon=True, args=(song_to_play,)
+                    )
+                    fetch_thread.start()
+                else:
+                    self.fetch_version += 1
+                    self.player.stop()

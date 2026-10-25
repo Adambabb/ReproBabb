@@ -54,7 +54,7 @@ class AudioController(QObject):
         vlc_state = self.player.get_state()
         self.process_vlc_state(vlc_state)
 
-    def _process_vlc_state(self, state):
+    def process_vlc_state(self, state):
         match state:
             case vlc.State.Opening:
                 state = "Loading Url"
