@@ -1,4 +1,13 @@
-from PySide6.QtCore import QObject, Signal, QTimer, QAbstractListModel, QModelIndex, Qt, QMimeData, QByteArray
+from PySide6.QtCore import (
+    QObject,
+    Signal,
+    QTimer,
+    QAbstractListModel,
+    QModelIndex,
+    Qt,
+    QMimeData,
+    QByteArray,
+)
 from PySide6.QtGui import QIcon, QPixmap
 import Motor
 import threading
@@ -12,7 +21,7 @@ class QueueModel(QAbstractListModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.songs_list = []
-        self._thumbnail_cache = {} 
+        self._thumbnail_cache = {}
 
     def rowCount(self, parent=QModelIndex()):
         return len(self.songs_list)
@@ -20,14 +29,14 @@ class QueueModel(QAbstractListModel):
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid() or not (0 <= index.row() < len(self.songs_list)):
             return None
-        
+
         song = self.songs_list[index.row()]
-        
+
         if role == Qt.UserRole:
             return song
         elif role == Qt.DecorationRole:
             return song.get("_icon", None)
-            
+
         return None
 
     def _apply_cached_thumbnails(self, songs):
@@ -73,7 +82,12 @@ class QueueModel(QAbstractListModel):
     def flags(self, index):
         default_flags = super().flags(index)
         if index.isValid():
-            return default_flags | Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsDragEnabled
+            return (
+                default_flags
+                | Qt.ItemIsSelectable
+                | Qt.ItemIsEnabled
+                | Qt.ItemIsDragEnabled
+            )
         return default_flags | Qt.ItemIsDropEnabled
 
     def supportedDropActions(self):
@@ -86,16 +100,19 @@ class QueueModel(QAbstractListModel):
         mime_data = QMimeData()
         valid_rows = [idx.row() for idx in indexes if idx.isValid()]
         if valid_rows:
-            encoded = json.dumps(valid_rows).encode('utf-8')
+            encoded = json.dumps(valid_rows).encode("utf-8")
             mime_data.setData("application/x-reprobabb-song-row", QByteArray(encoded))
         return mime_data
 
     def dropMimeData(self, data, action, row, column, parent):
-        if not data.hasFormat("application/x-reprobabb-song-row") or action != Qt.MoveAction:
+        if (
+            not data.hasFormat("application/x-reprobabb-song-row")
+            or action != Qt.MoveAction
+        ):
             return False
 
         encoded = data.data("application/x-reprobabb-song-row")
-        source_rows = json.loads(bytes(encoded).decode('utf-8'))
+        source_rows = json.loads(bytes(encoded).decode("utf-8"))
         if not source_rows:
             return False
 
@@ -111,7 +128,9 @@ class QueueModel(QAbstractListModel):
         if from_row == target_row or from_row == target_row - 1:
             return False
 
-        if self.beginMoveRows(QModelIndex(), from_row, from_row, QModelIndex(), target_row):
+        if self.beginMoveRows(
+            QModelIndex(), from_row, from_row, QModelIndex(), target_row
+        ):
             item = self.songs_list.pop(from_row)
             if from_row < target_row:
                 target_row -= 1
@@ -123,11 +142,10 @@ class QueueModel(QAbstractListModel):
         return False
 
 
-
 class SongQueue(QObject):
-    song_data = Signal(dict)         
+    song_data = Signal(dict)
     change_shuffle = Signal()
-    
+
     def __init__(self, player):
         super().__init__()
         self.player = player
@@ -144,17 +162,17 @@ class SongQueue(QObject):
         self.shuffle_song_list = []
         self.shuffle_current_index = 0
         self.fetch_version = 0
-        
+
         self.model = QueueModel()
         self.model.rows_reordered.connect(self.reorder_queue)
 
     def playing_playlist(self, playlist, start_index=0):
-        self._start_playlist(playlist, start_index, shuffled=False)
+        self.start_playlist(playlist, start_index, shuffled=False)
 
     def playing_playlist_shuffled(self, playlist):
-        self._start_playlist(playlist, 0, shuffled=True)
+        self.start_playlist(playlist, 0, shuffled=True)
 
-    def _start_playlist(self, playlist, start_index, shuffled):
+    def start_playlist(self, playlist, start_index, shuffled):
         song_to_play = None
         with self.lock:
             self.retry_count = 0
@@ -178,33 +196,44 @@ class SongQueue(QObject):
                 song = self.get_song_index()
                 song_to_play = song
         if song_to_play is not None:
-            fetch_thread = threading.Thread(target=self.fetch_song, daemon=True, args=(song_to_play,))
-            fetch_thread.start()
+            self.start_fetch(song_to_play)
         self.change_shuffle.emit()
-    
+
     def next_or_previous(self, direction):
         with self.lock:
             if direction == "next":
                 self.click_count += 1
             elif direction == "previous":
                 self.click_count -= 1
+            else:
+                raise ValueError(f"Invalid direction: '{direction}'")
         self.timer_click.start(200)
-    
+
     def process_click(self):
         with self.lock:
             if not self.songs_list or self.click_count == 0:
                 self.click_count = 0
                 return
             if self.is_shuffle:
-                self.shuffle_current_index = max(0, min(len(self.shuffle_song_list) - 1, self.shuffle_current_index + self.click_count))
+                self.shuffle_current_index = max(
+                    0,
+                    min(
+                        len(self.shuffle_song_list) - 1,
+                        self.shuffle_current_index + self.click_count,
+                    ),
+                )
                 self.current_index = self.shuffle_song_list[self.shuffle_current_index]
             else:
-                self.current_index = max(0, min(len(self.songs_list) - 1, self.current_index + self.click_count))
+                self.current_index = max(
+                    0,
+                    min(
+                        len(self.songs_list) - 1, self.current_index + self.click_count
+                    ),
+                )
             self.click_count = 0
             self.retry_count = 0
             song = self.get_song_index()
-        fetch_thread = threading.Thread(target=self.fetch_song, daemon=True, args=(song,))
-        fetch_thread.start()
+        self.start_fetch(song)
 
     def next_song_queue(self, state):
         song_to_play = None
@@ -225,9 +254,8 @@ class SongQueue(QObject):
                     self.retry_count = 0
 
         if song_to_play is not None:
-            fetch_thread = threading.Thread(target=self.fetch_song, daemon=True, args=(song_to_play,))
-            fetch_thread.start()
-    
+            self.start_fetch(song_to_play)
+
     def fetch_song(self, song):
         with self.lock:
             self.fetch_version += 1
@@ -250,7 +278,7 @@ class SongQueue(QObject):
                 with self.lock:
                     self.increment_index()
                     song = self.get_song_index()
-    
+
     def shuffle_queue(self):
         with self.lock:
             self.is_shuffle = not self.is_shuffle
@@ -259,15 +287,19 @@ class SongQueue(QObject):
                     self.shuffle_song_list = []
                     self.shuffle_current_index = 0
                     return
-                
+
                 if 0 <= self.current_index < len(self.songs_list):
-                    other_indices = [i for i in range(len(self.songs_list)) if i != self.current_index]
+                    other_indices = [
+                        i
+                        for i in range(len(self.songs_list))
+                        if i != self.current_index
+                    ]
                     random.shuffle(other_indices)
                     self.shuffle_song_list = [self.current_index] + other_indices
                 else:
                     self.shuffle_song_list = list(range(len(self.songs_list)))
                     random.shuffle(self.shuffle_song_list)
-                
+
                 self.shuffle_current_index = 0
                 new_list = [self.songs_list[i] for i in self.shuffle_song_list]
                 self.model.set_songs(new_list)
@@ -298,7 +330,7 @@ class SongQueue(QObject):
                 self.current_index = len(self.songs_list)
         else:
             self.current_index += 1
-     
+
     def add_to_queue(self, song):
         with self.lock:
             if self.is_shuffle:
@@ -311,9 +343,9 @@ class SongQueue(QObject):
             else:
                 insert_index = min(self.current_index + 1, len(self.songs_list))
                 self.songs_list.insert(insert_index, song)
-            
+
             self.model.insert_songs(insert_index, [song])
-                
+
     def add_multiple_to_queue(self, songs):
         if not songs:
             return
@@ -350,10 +382,9 @@ class SongQueue(QObject):
             self.songs_list = list(new_order)
             current_position = None
             if actual_song_playing is not None:
-                current_song_id = (
-                    actual_song_playing.get("id")
-                    or actual_song_playing.get("videoId")
-                )
+                current_song_id = actual_song_playing.get(
+                    "id"
+                ) or actual_song_playing.get("videoId")
                 current_position = next(
                     (
                         position
@@ -381,14 +412,19 @@ class SongQueue(QObject):
                     self.shuffle_current_index = min(
                         previous_shuffle_index, len(self.songs_list)
                     )
-    
+
     def remove_song_at_index(self, index):
+        song_to_play = None
+        removing_current = False
+
         with self.lock:
             if not (0 <= index < len(self.songs_list)):
                 return
 
             if self.is_shuffle:
                 if index < len(self.shuffle_song_list):
+                    removing_current = index == self.shuffle_current_index
+
                     real_index = self.shuffle_song_list.pop(index)
                     if real_index < len(self.songs_list):
                         self.songs_list.pop(real_index)
@@ -400,11 +436,38 @@ class SongQueue(QObject):
                     if index < self.shuffle_current_index:
                         self.shuffle_current_index -= 1
 
+                    if self.shuffle_current_index < len(self.shuffle_song_list):
+                        self.current_index = self.shuffle_song_list[
+                            self.shuffle_current_index
+                        ]
+                    else:
+                        self.current_index = len(self.songs_list)
+
                     self.model.remove_at(index)
             else:
+                removing_current = index == self.current_index
+
                 self.songs_list.pop(index)
 
                 if index < self.current_index:
                     self.current_index -= 1
 
                 self.model.remove_at(index)
+
+            if removing_current:
+                song_to_play = self.get_song_index()
+                self.retry_count = 0
+                if song_to_play is None:
+                    self.fetch_version += 1
+
+        if removing_current:
+            if song_to_play is not None:
+                self.start_fetch(song_to_play)
+            else:
+                self.player.stop()
+
+    def start_fetch(self, song):
+        fetch_thread = threading.Thread(
+            target=self.fetch_song, daemon=True, args=(song,)
+        )
+        fetch_thread.start()

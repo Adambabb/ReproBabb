@@ -3,99 +3,102 @@ import yt_dlp
 import urllib.parse
 from yt_dlp.utils import DownloadCancelled
 
-
 searcher = ytmusicapi.YTMusic()
-
 
 
 def set_account(file_path):
     global searcher
     try:
         if file_path:
-            searcher=ytmusicapi.YTMusic(file_path)
+            searcher = ytmusicapi.YTMusic(file_path)
             return True
         else:
             return False
     except Exception as e:
-        print("Error: ",  e)
-        searcher= ytmusicapi.YTMusic()
+        print("Error: ", e)
+        searcher = ytmusicapi.YTMusic()
         return False
 
+
 def get_user_playlist():
-    user_playlist=searcher.get_library_playlists()
-    playlist_fetched=[]
+    user_playlist = searcher.get_library_playlists()
+    playlist_fetched = []
     if user_playlist:
         for playlist in user_playlist:
-            playlist_data={
-                "title":playlist.get("title",""),
-                "playlistId":playlist.get("playlistId",""),
-                "thumbnails":playlist.get("thumbnails",[])
-                }
+            playlist_data = {
+                "title": playlist.get("title", ""),
+                "playlistId": playlist.get("playlistId", ""),
+                "thumbnails": playlist.get("thumbnails", []),
+            }
             playlist_fetched.append(playlist_data)
     return playlist_fetched
-    
 
-    
+
 def playlist_data(playlist_id):
-    raw_playlist=searcher.get_playlist(playlist_id,limit=None)
-    song_list=[]
-    if len(raw_playlist.get("tracks",[]))>0 :
-        tracks=raw_playlist["tracks"]
+    raw_playlist = searcher.get_playlist(playlist_id, limit=None)
+    song_list = []
+    if len(raw_playlist.get("tracks", [])) > 0:
+        tracks = raw_playlist["tracks"]
         for song in tracks:
-            formatted_song=music_data(song)
-            formatted_song["setVideoId"]=song.get("setVideoId","")
-            if formatted_song["status"]=="error":
+            formatted_song = music_data(song)
+            formatted_song["setVideoId"] = song.get("setVideoId", "")
+            if formatted_song["status"] == "error":
                 continue
             song_list.append(formatted_song)
-        if len(song_list)==0:
-                song_list.append(music_data(None))
+        if len(song_list) == 0:
+            song_list.append(music_data(None))
         return song_list
     else:
-        formatted_song=music_data(None)
+        formatted_song = music_data(None)
         song_list.append(formatted_song)
         return song_list
+
 
 def song_data(song_id):
     if not song_id or not song_id.strip():
         return []
-    raw_song=searcher.search(song_id,filter="songs")
-    list_song=[]
+    raw_song = searcher.search(song_id, filter="songs")
+    list_song = []
     if raw_song:
-        for i in raw_song[:5]:         
-            formatted_song=music_data(i)
+        for i in raw_song[:5]:
+            formatted_song = music_data(i)
             list_song.append(formatted_song)
         return list_song
     else:
-        formatted_song=music_data(None)
+        formatted_song = music_data(None)
         list_song.append(formatted_song)
         return list_song
 
+
 def song_link_data(song_link_id):
-    raw_song_link=searcher.get_song(song_link_id)
+    raw_song_link = searcher.get_song(song_link_id)
     if raw_song_link:
         try:
-            formatted_song=music_data(raw_song_link)
+            formatted_song = music_data(raw_song_link)
             return formatted_song
         except Exception as e:
             error_message = str(e)
             print(error_message)
     else:
-        formatted_song=music_data(None)
+        formatted_song = music_data(None)
         return formatted_song
+
 
 def music_data(raw_song):
     if raw_song:
         if "videoDetails" in raw_song:
-            videoDetails=raw_song["videoDetails"]
+            videoDetails = raw_song["videoDetails"]
             thumbnail_data = videoDetails.get("thumbnail", {}).get("thumbnails", [])
-            song={
-                "status":"success",
-                "title": videoDetails.get("title",""),
-                "id": videoDetails.get("videoId",""),
-                "duration": int(videoDetails.get("lengthSeconds",0)),
-                "thumbnails": thumbnail_data if isinstance(thumbnail_data, list) else [],
-                "artists": videoDetails.get("author","")
-                }
+            song = {
+                "status": "success",
+                "title": videoDetails.get("title", ""),
+                "id": videoDetails.get("videoId", ""),
+                "duration": int(videoDetails.get("lengthSeconds", 0)),
+                "thumbnails": (
+                    thumbnail_data if isinstance(thumbnail_data, list) else []
+                ),
+                "artists": videoDetails.get("author", ""),
+            }
             return song
         else:
             thumbnail_data = raw_song.get("thumbnails") or raw_song.get("thumbnail", [])
@@ -108,98 +111,109 @@ def music_data(raw_song):
                 )
             if not isinstance(thumbnail_data, list):
                 thumbnail_data = []
-            song={
-                "status":"success",
-                "title": raw_song.get("title",""),
-                "id": raw_song.get("videoId",""),
-                "duration": int(raw_song.get("duration_seconds",0)),
+            song = {
+                "status": "success",
+                "title": raw_song.get("title", ""),
+                "id": raw_song.get("videoId", ""),
+                "duration": int(raw_song.get("duration_seconds", 0)),
                 "thumbnails": thumbnail_data,
-                "artists": raw_song.get("artists","")
+                "artists": raw_song.get("artists", ""),
             }
             return song
     else:
-        song={
-            "status":"error",
+        song = {
+            "status": "error",
             "title": "Not found",
             "id": "",
             "duration": "",
             "thumbnails": "",
-            "artists": ""
+            "artists": "",
         }
         return song
 
-def add_song_playlist(playlist_id,song_id,duplicates=True):
+
+def add_song_playlist(playlist_id, song_id, duplicates=True):
     try:
-        song_id_list=[song_id]
-        searcher.add_playlist_items(playlist_id,song_id_list,duplicates=duplicates)
-        add_status={"status":"success"}
+        song_id_list = [song_id]
+        searcher.add_playlist_items(playlist_id, song_id_list, duplicates=duplicates)
+        add_status = {"status": "success"}
         return add_status
     except Exception as e:
-        error_message=str(e)
-        add_status={"error": error_message,
-                    "status":"error"}
+        error_message = str(e)
+        add_status = {"error": error_message, "status": "error"}
         return add_status
 
-def remove_song_playlist(playlist_id,formatted_song):
-    track={
-        "videoId":formatted_song.get("id",""),
-        "setVideoId":formatted_song.get("setVideoId","")
+
+def remove_song_playlist(playlist_id, formatted_song):
+    track = {
+        "videoId": formatted_song.get("id", ""),
+        "setVideoId": formatted_song.get("setVideoId", ""),
     }
     try:
-        searcher.remove_playlist_items(playlist_id,[track])
-        add_status={"status":"success"}
+        searcher.remove_playlist_items(playlist_id, [track])
+        add_status = {"status": "success"}
         return add_status
     except Exception as e:
-        error_message=str(e)
-        add_status={"error": error_message,
-                    "status":"error"}
+        error_message = str(e)
+        add_status = {"error": error_message, "status": "error"}
         return add_status
-    
+
+
 def search_bar(user_input):
     if "http" in user_input:
-        result=None
-        parsed_url=urllib.parse.urlparse(user_input)
-        params=urllib.parse.parse_qs(parsed_url.query)
+        result = None
+        parsed_url = urllib.parse.urlparse(user_input)
+        params = urllib.parse.parse_qs(parsed_url.query)
         if "v" in params:
-            result=song_link_data(params["v"][0])
+            result = song_link_data(params["v"][0])
         elif "list" in params:
-            result=playlist_data(params["list"][0])
+            result = playlist_data(params["list"][0])
         else:
-            result=song_data(user_input)
+            result = song_data(user_input)
     else:
-        result=song_data(user_input)
+        result = song_data(user_input)
     return result
+
+
 fetcher_options = {
-    'format': 'bestaudio/best',
-    'quiet': True,
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'ios']
-        }
-    }
+    "format": "bestaudio/best",
+    "quiet": True,
+    "extractor_args": {"youtube": {"player_client": ["android", "ios"]}},
 }
-    
-def fetch(video_id, download=False, destination=None, is_cancelled_fn=None, update_progress_fn=None):
+
+
+def fetch(
+    video_id,
+    download=False,
+    destination=None,
+    is_cancelled_fn=None,
+    update_progress_fn=None,
+):
     options = fetcher_options.copy()
     if download:
-        options['outtmpl'] = f"{destination}/%(title)s.%(ext)s"
+        options["outtmpl"] = f"{destination}/%(title)s.%(ext)s"
 
     if is_cancelled_fn or update_progress_fn:
+
         def progress_hook(progress_data):
             if is_cancelled_fn and is_cancelled_fn():
                 raise DownloadCancelled()
-            
+
             if update_progress_fn:
-                status = progress_data.get('status')
-                if status == 'downloading':
-                    downloaded = progress_data.get('downloaded_bytes', 0)
-                    total = progress_data.get('total_bytes', 1) or 1
-                    percentage = int((downloaded / total) * 100)
+                status = progress_data.get("status")
+                if status == "downloading":
+                    downloaded = progress_data.get("downloaded_bytes", 0)
+                    total = progress_data.get("total_bytes") or progress_data.get(
+                        "total_bytes_estimate"
+                    )
+                    if not total:
+                        return
+                    percentage = min(int((downloaded / total) * 100), 100)
                     update_progress_fn(percentage)
-                elif status == 'finished':
+                elif status == "finished":
                     update_progress_fn(100)
 
-        options['progress_hooks'] = [progress_hook]
+        options["progress_hooks"] = [progress_hook]
 
     with yt_dlp.YoutubeDL(options) as fetcher:
         try:
@@ -208,14 +222,18 @@ def fetch(video_id, download=False, destination=None, is_cancelled_fn=None, upda
             if not download:
                 fetch_result = {"url": info["url"], "status": "success"}
             else:
-                fetch_result = {"url": fetcher.prepare_filename(info), "status": "success"}
-            
+                fetch_result = {
+                    "url": fetcher.prepare_filename(info),
+                    "status": "success",
+                }
+
             return fetch_result
         except Exception as e:
             error_message = str(e)
             fetch_result = {"error": error_message, "status": "error"}
             return fetch_result
-        
+
+
 def get_similar_songs(video_id):
     try:
         watch_data = searcher.get_watch_playlist(videoId=video_id, limit=25)
@@ -223,13 +241,9 @@ def get_similar_songs(video_id):
         similar_songs = []
         for track in tracks:
             if track.get("videoId") == video_id:
-                continue  
+                continue
             similar_songs.append(music_data(track))
         return similar_songs
     except Exception as e:
         print(f"Error al obtener similares: {e}")
         return []
-
-
-    
-        
