@@ -2,6 +2,8 @@ from PySide6.QtCore import QObject, Signal
 
 try:
     import vlc
+
+    VLC_IMPORT_ERROR = None
 except Exception as error:
     vlc = None
     VLC_IMPORT_ERROR = error

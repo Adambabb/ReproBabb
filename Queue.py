@@ -196,10 +196,7 @@ class SongQueue(QObject):
                 song = self.get_song_index()
                 song_to_play = song
         if song_to_play is not None:
-            fetch_thread = threading.Thread(
-                target=self.fetch_song, daemon=True, args=(song_to_play,)
-            )
-            fetch_thread.start()
+            self.start_fetch(song_to_play)
         self.change_shuffle.emit()
 
     def next_or_previous(self, direction):
@@ -236,10 +233,7 @@ class SongQueue(QObject):
             self.click_count = 0
             self.retry_count = 0
             song = self.get_song_index()
-        fetch_thread = threading.Thread(
-            target=self.fetch_song, daemon=True, args=(song,)
-        )
-        fetch_thread.start()
+        self.start_fetch(song)
 
     def next_song_queue(self, state):
         song_to_play = None
@@ -260,10 +254,7 @@ class SongQueue(QObject):
                     self.retry_count = 0
 
         if song_to_play is not None:
-            fetch_thread = threading.Thread(
-                target=self.fetch_song, daemon=True, args=(song_to_play,)
-            )
-            fetch_thread.start()
+            self.start_fetch(song_to_play)
 
     def fetch_song(self, song):
         with self.lock:
@@ -466,12 +457,17 @@ class SongQueue(QObject):
             if removing_current:
                 song_to_play = self.get_song_index()
                 self.retry_count = 0
-
-                if song_to_play is not None:
-                    fetch_thread = threading.Thread(
-                        target=self.fetch_song, daemon=True, args=(song_to_play,)
-                    )
-                    fetch_thread.start()
-                else:
+                if song_to_play is None:
                     self.fetch_version += 1
-                    self.player.stop()
+
+        if removing_current:
+            if song_to_play is not None:
+                self.start_fetch(song_to_play)
+            else:
+                self.player.stop()
+
+    def start_fetch(self, song):
+        fetch_thread = threading.Thread(
+            target=self.fetch_song, daemon=True, args=(song,)
+        )
+        fetch_thread.start()

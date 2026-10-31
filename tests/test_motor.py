@@ -3,15 +3,17 @@ from unittest.mock import MagicMock, patch
 import Motor
 
 
+@patch("Motor.searcher")
 @patch("Motor.ytmusicapi.YTMusic")
-def test_set_account_success(mock_ytmusic_class):
+def test_set_account_success(mock_ytmusic_class, mock_searcher):
     success = Motor.set_account("fake_credentials.json")
     assert success is True
     mock_ytmusic_class.assert_called_once_with("fake_credentials.json")
 
 
+@patch("Motor.searcher")
 @patch("Motor.ytmusicapi.YTMusic")
-def test_set_account_failure(mock_ytmusic_class):
+def test_set_account_failure(mock_ytmusic_class, mock_searcher):
     mock_ytmusic_class.side_effect = [Exception("Invalid file"), MagicMock()]
 
     success = Motor.set_account("invalid.json")
@@ -219,3 +221,62 @@ def test_get_similar_songs(mock_searcher):
     similar = Motor.get_similar_songs("v1")
     assert len(similar) == 1
     assert similar[0]["id"] == "v2"
+
+
+@patch("Motor.yt_dlp.YoutubeDL")
+def test_total_bytes(mock_ytDL):
+    mock_progress = MagicMock()
+    Motor.fetch("v1", update_progress_fn=mock_progress)
+    hook = mock_ytDL.call_args[0][0]["progress_hooks"][0]
+    progress_data = {
+        "status": "downloading",
+        "downloaded_bytes": 50,
+        "total_bytes": 100,
+    }
+    hook(progress_data)
+    mock_progress.assert_called_once_with(50)
+
+
+@patch("Motor.yt_dlp.YoutubeDL")
+def test_total_bytes_estimate(mock_ytDL):
+    mock_progress = MagicMock()
+    Motor.fetch("v1", update_progress_fn=mock_progress)
+    hook = mock_ytDL.call_args[0][0]["progress_hooks"][0]
+    progress_data = {
+        "status": "downloading",
+        "downloaded_bytes": 50,
+        "total_bytes": None,
+        "total_bytes_estimate": 100,
+    }
+    hook(progress_data)
+    mock_progress.assert_called_once_with(50)
+
+
+@patch("Motor.yt_dlp.YoutubeDL")
+def test_no_total_bytes(mock_ytDL):
+    mock_progress = MagicMock()
+    Motor.fetch("v1", update_progress_fn=mock_progress)
+    hook = mock_ytDL.call_args[0][0]["progress_hooks"][0]
+    progress_data = {
+        "status": "downloading",
+        "downloaded_bytes": 50,
+        "total_bytes": None,
+        "total_bytes_estimate": None,
+    }
+    assert hook(progress_data) is None
+    mock_progress.assert_not_called()
+
+
+@patch("Motor.yt_dlp.YoutubeDL")
+def test_total_bytes_estimate_exceeded(mock_ytDL):
+    mock_progress = MagicMock()
+    Motor.fetch("v1", update_progress_fn=mock_progress)
+    hook = mock_ytDL.call_args[0][0]["progress_hooks"][0]
+    progress_data = {
+        "status": "downloading",
+        "downloaded_bytes": 1001,
+        "total_bytes": None,
+        "total_bytes_estimate": 100,
+    }
+    hook(progress_data)
+    mock_progress.assert_called_once_with(100)

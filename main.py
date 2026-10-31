@@ -1,5 +1,11 @@
 import sys
-from PySide6.QtWidgets import QApplication, QMessageBox,QTabWidget,QVBoxLayout,QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QMessageBox,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QSettings, QObject
 from PySide6.QtGui import QGuiApplication
@@ -13,6 +19,7 @@ from Controllers.LibraryController import LibraryController
 from Controllers.SearchController import SearchController
 from Utils import resource_path
 
+
 class MainWindow(QObject):
     def __init__(self):
         super().__init__()
@@ -20,7 +27,7 @@ class MainWindow(QObject):
         self.window = QWidget()
         self.window.setWindowTitle("ReproBabb")
         self.window.setMinimumSize(640, 420)
-        
+
         icon_path = resource_path("Assets/ReproBabb.ico")
         app_icon = QIcon(icon_path)
         self.window.setWindowIcon(app_icon)
@@ -29,14 +36,18 @@ class MainWindow(QObject):
         self.settings = QSettings("Reprobabb", "Reprobabb")
         QCoreApplication.setOrganizationName("Reprobabb")
         QCoreApplication.setApplicationName("Reprobabb")
-        
+
         with open(resource_path("Styles/styles.qss"), "r") as f:
             self.app.setStyleSheet(f.read())
 
         try:
             self.player = Player.AudioController()
         except Player.VlcNotAvailableError:
-            QMessageBox.critical(self.window, "VLC was not found. ReproBabb needs VLC (64-bit) installed. You can download it from videolan.org.")
+            QMessageBox.critical(
+                self.window,
+                "Error de VLC",
+                "VLC was not found. ReproBabb needs VLC (64-bit) installed. You can download it from videolan.org.",
+            )
             sys.exit(1)
         self.queue = Queue.SongQueue(self.player)
         self.download_queue = DownloadQueue.DownloadQueue()
@@ -55,7 +66,9 @@ class MainWindow(QObject):
         self.download_tab = DownloadTab.DownloadTab()
         self.keyboard_controls = KeyboardControls.KeyboardControls(self)
         self.mini_player = MiniPlayer.MiniPlayer(self.queue.model)
-        self.mini_player.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
+        self.mini_player.setWindowFlags(
+            Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint
+        )
         self.mini_player.setWindowTitle("ReproBabb Mini Player")
         self.mini_player.setWindowIcon(app_icon)
         self.mini_player.hide()
@@ -73,8 +86,16 @@ class MainWindow(QObject):
         layout = QVBoxLayout(self.window)
         layout.addWidget(self.tab)
 
-        self.download_ctrl = DownloadController(self.settings, self.download_queue, self.window)
-        self.library_ctrl = LibraryController(self.settings, self.library_tab, self.player_tab, self.thumbnail, self.window)
+        self.download_ctrl = DownloadController(
+            self.settings, self.download_queue, self.window
+        )
+        self.library_ctrl = LibraryController(
+            self.settings,
+            self.library_tab,
+            self.player_tab,
+            self.thumbnail,
+            self.window,
+        )
         self.search_ctrl = SearchController(self.player_tab, self.thumbnail)
         self.download_tab.download_path_requested.connect(
             self.download_ctrl.choose_download_path
@@ -82,14 +103,14 @@ class MainWindow(QObject):
         self.download_ctrl.download_path_changed.connect(
             self.download_tab.set_download_path
         )
-        self.download_tab.set_download_path(
-            self.settings.value("download_path", "")
-        )
+        self.download_tab.set_download_path(self.settings.value("download_path", ""))
 
         self._wire_signals()
 
         self.app.aboutToQuit.connect(
-            lambda: self.thumbnail.download_list_thumbnail_executor.shutdown(wait=False, cancel_futures=True)
+            lambda: self.thumbnail.download_list_thumbnail_executor.shutdown(
+                wait=False, cancel_futures=True
+            )
         )
         self.app.aboutToQuit.connect(self.keyboard_controls.stop)
         self.library_ctrl.try_auto_login()
@@ -103,12 +124,18 @@ class MainWindow(QObject):
         self.player_tab.search_requested.connect(self.search_ctrl.search)
         self.player_tab.mini_player_requested.connect(self.show_mini_player)
         self.mini_player.expanded_requested.connect(self.show_main_window)
-        self.search_ctrl.search_completed.connect(self.search_ctrl.process_search_results)
+        self.search_ctrl.search_completed.connect(
+            self.search_ctrl.process_search_results
+        )
         self.search_ctrl.similar_songs_fetched.connect(self.queue.add_multiple_to_queue)
 
         self.player_tab.play_pause_toggled.connect(self.player.toggle_pause_play)
-        self.player_tab.next_requested.connect(lambda: self.queue.next_or_previous("next"))
-        self.player_tab.previous_requested.connect(lambda: self.queue.next_or_previous("previous"))
+        self.player_tab.next_requested.connect(
+            lambda: self.queue.next_or_previous("next")
+        )
+        self.player_tab.previous_requested.connect(
+            lambda: self.queue.next_or_previous("previous")
+        )
         self.player_tab.time_changed.connect(self.player.set_actual_time)
         self.player_tab.volume_changed.connect(self.player.set_volume)
         self.player_tab.shuffle_requested.connect(self.toggle_shuffle)
@@ -120,7 +147,7 @@ class MainWindow(QObject):
             lambda: self.queue.next_or_previous("next")
         )
         self.mini_player.shuffle_requested.connect(self.toggle_shuffle)
-        
+
         self.player_tab.play_requested.connect(self.queue.playing_playlist)
         self.player_tab.play_requested.connect(self.search_ctrl.fetch_similar_songs)
         self.player_tab.play_queue_song.connect(self.queue.playing_playlist)
@@ -143,16 +170,26 @@ class MainWindow(QObject):
         self.queue.change_shuffle.connect(self.reset_shuffle)
 
         self.library_tab.load_account_requested.connect(self.library_ctrl.load_account)
-        self.library_tab.create_browser_requested.connect(self.library_ctrl.create_browser_session)
-        self.library_tab.playlist_content_selected.connect(self.library_ctrl.fetch_playlist_songs)
+        self.library_tab.create_browser_requested.connect(
+            self.library_ctrl.create_browser_session
+        )
+        self.library_tab.playlist_content_selected.connect(
+            self.library_ctrl.fetch_playlist_songs
+        )
         self.library_tab.playlist_play_requested.connect(self.queue.playing_playlist)
         self.library_ctrl.playlist_data_fetched.connect(self.on_playlist_fetched)
         self.player_tab.added_playlist.connect(self.library_ctrl.add_song_to_playlist)
-        self.library_tab.song_playlist_delete.connect(self.library_ctrl.remove_song_from_playlist)
+        self.library_tab.song_playlist_delete.connect(
+            self.library_ctrl.remove_song_from_playlist
+        )
 
         self.player_tab.download_requested.connect(self.download_ctrl.download_song)
-        self.library_tab.playlist_download_requested.connect(self.download_ctrl.download_playlist)
-        self.download_tab.cancel_download_requested.connect(self.download_queue.cancel_download)
+        self.library_tab.playlist_download_requested.connect(
+            self.download_ctrl.download_playlist
+        )
+        self.download_tab.cancel_download_requested.connect(
+            self.download_queue.cancel_download
+        )
 
         self.thumbnail.thumbnail_changed.connect(self.player_tab.update_thumbnail)
         self.thumbnail.thumbnail_changed.connect(self.mini_player.set_thumbnail)
@@ -227,6 +264,7 @@ class MainWindow(QObject):
         self.player_tab.set_list_thumbnail(image, id_key)
         self.mini_player.set_list_thumbnail(image, id_key)
         self.library_tab.set_list_thumbnail(image, id_key)
+
 
 if __name__ == "__main__":
     start = MainWindow()

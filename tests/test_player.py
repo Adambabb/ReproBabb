@@ -1,5 +1,6 @@
-from Player import AudioController
+from Player import AudioController, VlcNotAvailableError
 from unittest.mock import MagicMock, patch
+import pytest
 
 
 @patch("Player.vlc")
@@ -11,7 +12,7 @@ def test_audio_controller_states(mock_vlc):
     emitted_signals = []
     player_AudioController.state_changed.connect(emitted_signals.append)
 
-    player_AudioController._process_vlc_state(mock_vlc.State.Playing)
+    player_AudioController.process_vlc_state(mock_vlc.State.Playing)
 
     assert player_AudioController.has_played is True
     assert player_AudioController.get_state() == "Playing"
@@ -28,7 +29,7 @@ def test_transition_finished(mock_vlc):
     emitted_signals = []
     player_AudioController.state_changed.connect(emitted_signals.append)
 
-    player_AudioController._process_vlc_state(mock_vlc.State.Ended)
+    player_AudioController.process_vlc_state(mock_vlc.State.Ended)
 
     assert player_AudioController.get_state() == "Ended Media"
     assert emitted_signals == ["Ended Media"]
@@ -43,7 +44,7 @@ def test_transition_finished_without_play(mock_vlc):
     emitted_signals = []
     player_AudioController.state_changed.connect(emitted_signals.append)
 
-    player_AudioController._process_vlc_state(mock_vlc.State.Ended)
+    player_AudioController.process_vlc_state(mock_vlc.State.Ended)
 
     assert player_AudioController.get_state() == "Cannot Reproduce"
     assert emitted_signals == ["Cannot Reproduce"]
@@ -113,3 +114,25 @@ def test_set_actual_time(mock_vlc):
     player_AudioController.set_actual_time(new_time)
 
     player_AudioController.player.set_time.assert_called_once_with(new_time)
+
+
+@patch("Player.vlc", None)
+def test_vlc_module_missing_raises_error():
+    with pytest.raises(VlcNotAvailableError):
+        AudioController()
+
+
+@patch("Player.vlc")
+def test_vlc_instance_raising_raises_error(mock_vlc):
+    mock_vlc.Instance.side_effect = Exception("boom")
+
+    with pytest.raises(VlcNotAvailableError):
+        AudioController()
+
+
+@patch("Player.vlc")
+def test_vlc_instance_none_raises_error(mock_vlc):
+    mock_vlc.Instance.return_value = None
+
+    with pytest.raises(VlcNotAvailableError):
+        AudioController()

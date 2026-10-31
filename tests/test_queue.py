@@ -7,6 +7,13 @@ from Queue import SongQueue
 class FakePlayer(QObject):
     state_changed = Signal(str)
 
+    def __init__(self):
+        super().__init__()
+        self.stopped = False
+
+    def stop(self):
+        self.stopped = True
+
 
 def make_songs(n):
     return [{"id": f"id{i}", "title": f"Song {i}"} for i in range(n)]
@@ -17,6 +24,8 @@ def queue():
     q = SongQueue(FakePlayer())
     q.songs_list = make_songs(4)
     q.model.set_songs(q.songs_list)
+    q.fetched = []
+    q.start_fetch = lambda song: q.fetched.append(song["id"])
     return q
 
 
@@ -242,11 +251,12 @@ def test_remove_song_before_current_index(queue):
 def test_remove_currently_playing_song(queue):
     queue.current_index = 1
     next_song = queue.songs_list[2]
-
+    queue.fetched.clear()
     queue.remove_song_at_index(1)
 
     assert queue.current_index == 1
     assert queue.get_song_index() == next_song
+    assert queue.fetched == [next_song["id"]]
 
 
 def test_remove_song_before_current_index_shuffled(queue):
@@ -291,6 +301,7 @@ def test_remove_currently_playing_song_shuffled(queue):
     queue.shuffle_current_index = 1
     next_song = queue.songs_list[queue.shuffle_song_list[2]]
 
+    queue.fetched.clear()
     queue.remove_song_at_index(1)
 
     assert queue.shuffle_current_index == 1
@@ -298,3 +309,56 @@ def test_remove_currently_playing_song_shuffled(queue):
         queue.songs_list[queue.shuffle_song_list[queue.shuffle_current_index]]
         == next_song
     )
+    assert queue.fetched == [next_song["id"]]
+
+
+def test_remove_last_playing_song(queue):
+    queue.current_index = 0
+    queue.songs_list = make_songs(1)
+
+    queue.fetched.clear()
+    queue.remove_song_at_index(queue.current_index)
+
+    assert queue.current_index == len(queue.songs_list)
+    assert queue.player.stopped is True
+    assert queue.get_song_index() is None
+    assert queue.fetched == []
+
+
+def test_remove_last_playing_song_shuffled(queue):
+    queue.current_index = 0
+    queue.songs_list = make_songs(1)
+    queue.shuffle_queue()
+
+    queue.fetched.clear()
+    queue.remove_song_at_index(queue.current_index)
+
+    assert queue.current_index == len(queue.songs_list)
+    assert queue.shuffle_current_index == len(queue.shuffle_song_list)
+    assert queue.player.stopped is True
+    assert queue.get_song_index() is None
+    assert queue.fetched == []
+
+
+def test_remove_song_finished_queue(queue):
+    queue.current_index = len(queue.songs_list)
+
+    queue.fetched.clear()
+
+    queue.remove_song_at_index(queue.current_index)
+
+    assert queue.get_song_index() is None
+    assert queue.fetched == []
+
+
+def test_remove_song_finished_queue_shuffled(queue):
+    queue.current_index = len(queue.songs_list)
+    queue.shuffle_queue()
+    queue.shuffle_current_index = len(queue.shuffle_song_list)
+
+    queue.fetched.clear()
+
+    queue.remove_song_at_index(queue.shuffle_current_index)
+
+    assert queue.get_song_index() is None
+    assert queue.fetched == []
