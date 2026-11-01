@@ -3,9 +3,21 @@ import os
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtGui import QFont, QFontMetrics, QIcon, QPixmap
-from PySide6.QtWidgets import QAbstractItemView,QFrame,QHBoxLayout,QLabel,QListView,QPushButton,QStyledItemDelegate,QSizePolicy,QStyle,QVBoxLayout,QWidget
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QListView,
+    QPushButton,
+    QStyledItemDelegate,
+    QSizePolicy,
+    QStyle,
+    QVBoxLayout,
+    QWidget,
+)
 
-from Utils import resource_path
+from utils import resource_path
 
 
 class MiniQueueDelegate(QStyledItemDelegate):
@@ -74,7 +86,7 @@ class MiniPlayer(QWidget):
 
     def __init__(self, queue_model):
         super().__init__()
-        self._cover = QPixmap(resource_path(os.path.join("Assets", "Vinyl-Cover.png")))
+        self._cover = QPixmap(resource_path(os.path.join("assets", "Vinyl-Cover.png")))
         self.current_song_id = None
         self._song_thumbnail_cache = {}
         self.setObjectName("miniPlayer")
@@ -147,7 +159,9 @@ class MiniPlayer(QWidget):
         self.queue_list = QListView()
         self.queue_list.setModel(queue_model)
         self.queue_list.setItemDelegate(MiniQueueDelegate(self.queue_list))
-        self.queue_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.queue_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
         self.queue_list.setMinimumHeight(60)
         self.queue_list.setMaximumHeight(65)
         self.queue_list.setSizePolicy(
@@ -161,7 +175,7 @@ class MiniPlayer(QWidget):
 
     def _icon_button(self, icon_name, accessible_name):
         button = QPushButton()
-        button.setIcon(QIcon(resource_path(os.path.join("Assets", icon_name))))
+        button.setIcon(QIcon(resource_path(os.path.join("assets", icon_name))))
         button.setIconSize(QSize(18, 18))
         button.setAccessibleName(accessible_name)
         return button
@@ -193,7 +207,7 @@ class MiniPlayer(QWidget):
             )
         else:
             self._cover = QPixmap(
-                resource_path(os.path.join("Assets", "Vinyl-Cover.png"))
+                resource_path(os.path.join("assets", "Vinyl-Cover.png"))
             )
             self._update_cover()
 
@@ -229,7 +243,7 @@ class MiniPlayer(QWidget):
     def set_playback_state(self, state):
         icon_name = "Pause.png" if state == "Playing" else "Play.png"
         self.play_button.setIcon(
-            QIcon(resource_path(os.path.join("Assets", icon_name)))
+            QIcon(resource_path(os.path.join("assets", icon_name)))
         )
 
     def set_shuffle_enabled(self, enabled):

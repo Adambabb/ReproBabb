@@ -3,7 +3,8 @@ import re
 import threading
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QFileDialog
-import Motor
+import motor
+
 
 class DownloadController(QObject):
     download_path_changed = Signal(str)
@@ -25,7 +26,7 @@ class DownloadController(QObject):
         thread = threading.Thread(
             target=self._run_download,
             daemon=True,
-            args=(song_id, destination, download_id)
+            args=(song_id, destination, download_id),
         )
         thread.start()
 
@@ -47,21 +48,31 @@ class DownloadController(QObject):
         thread = threading.Thread(
             target=self._run_playlist_download,
             daemon=True,
-            args=(playlist_folder, songs_with_ids)
+            args=(playlist_folder, songs_with_ids),
         )
         thread.start()
 
     def _run_download(self, song_id, destination, download_id):
         if not self.download_queue.start_download(download_id):
             return
-        res = Motor.fetch(
+        res = motor.fetch(
             song_id,
             download=True,
             destination=destination,
             is_cancelled_fn=lambda: self.download_queue.is_cancelled(download_id),
-            update_progress_fn=lambda pct: self.download_queue.update_progress(download_id, pct)
+            update_progress_fn=lambda pct: self.download_queue.update_progress(
+                download_id, pct
+            ),
         )
-        status = "finished" if res["status"] == "success" else ("cancelled" if self.download_queue.is_cancelled(download_id) else "error")
+        status = (
+            "finished"
+            if res["status"] == "success"
+            else (
+                "cancelled"
+                if self.download_queue.is_cancelled(download_id)
+                else "error"
+            )
+        )
         self.download_queue.update_status(download_id, status)
 
     @staticmethod

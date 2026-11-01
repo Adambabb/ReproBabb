@@ -1,6 +1,17 @@
-from PySide6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QLineEdit, QListWidget, 
-                             QListWidgetItem, QPushButton, QLabel, QFileDialog, QMenu, 
-                             QListView, QAbstractItemView)
+from PySide6.QtWidgets import (
+    QWidget,
+    QHBoxLayout,
+    QVBoxLayout,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QLabel,
+    QFileDialog,
+    QMenu,
+    QListView,
+    QAbstractItemView,
+)
 from PySide6.QtCore import (
     Signal,
     QSize,
@@ -10,7 +21,8 @@ from PySide6.QtCore import (
     QSortFilterProxyModel,
 )
 from PySide6.QtGui import QIcon, QPixmap
-import CustomWidgets
+import custom_widgets
+
 
 class PlaylistSongsModel(QAbstractListModel):
     def __init__(self, parent=None):
@@ -24,13 +36,13 @@ class PlaylistSongsModel(QAbstractListModel):
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid() or not (0 <= index.row() < len(self.songs_list)):
             return None
-        
+
         song = self.songs_list[index.row()]
         if role == Qt.UserRole:
             return song
         elif role == Qt.DecorationRole:
             return song.get("_icon", None)
-            
+
         return None
 
     def set_songs(self, songs):
@@ -98,23 +110,23 @@ class LibraryTab(QWidget):
         self.playlists_songs = QHBoxLayout()
         self.library_vlayout = QVBoxLayout()
         self.library_state_hlayout = QHBoxLayout()
-        
+
         self.sesion_status = QLabel("State: No account")
         self.library_vlayout.addWidget(self.sesion_status)
-        
+
         self.browser_route = QLineEdit()
         self.browser_route.setReadOnly(True)
         self.library_state_hlayout.addWidget(self.browser_route)
-        
+
         self.create_browser_button = QPushButton("Create Browser: To load account")
         self.create_browser_button.clicked.connect(self.create_browser)
         self.library_vlayout.addWidget(self.create_browser_button)
-        
+
         self.browser_search = QPushButton("Browse_Account:...")
         self.browser_search.clicked.connect(self.select_load_account)
         self.library_state_hlayout.addWidget(self.browser_search)
         self.library_vlayout.addLayout(self.library_state_hlayout)
-        
+
         self.download_playlist_button = QPushButton("Download Playlist")
         self.download_playlist_button.clicked.connect(self.download_playlist)
         self.library_vlayout.addWidget(self.download_playlist_button)
@@ -130,17 +142,23 @@ class LibraryTab(QWidget):
         self.user_playlists.itemClicked.connect(self.select_user_playlist)
 
         self.user_playlists_songs = QListView(self)
-        self.user_playlists_songs.setItemDelegate(CustomWidgets.SongItemDelegate(self.user_playlists_songs))
+        self.user_playlists_songs.setItemDelegate(
+            custom_widgets.SongItemDelegate(self.user_playlists_songs)
+        )
         self.user_playlists_songs.setSelectionMode(QAbstractItemView.SingleSelection)
-        
+
         self.playlist_songs_model = PlaylistSongsModel()
         self.playlist_songs_filter_model = PlaylistSongsFilterModel(self)
         self.playlist_songs_filter_model.setSourceModel(self.playlist_songs_model)
         self.user_playlists_songs.setModel(self.playlist_songs_filter_model)
-        
+
         self.user_playlists_songs.clicked.connect(self.play_playlist_song_at)
-        self.user_playlists_songs.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.user_playlists_songs.customContextMenuRequested.connect(self.playlist_context_menu)
+        self.user_playlists_songs.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
+        self.user_playlists_songs.customContextMenuRequested.connect(
+            self.playlist_context_menu
+        )
 
         self.playlist_search_box = QLineEdit()
         self.playlist_search_box.setPlaceholderText("Search songs in this playlist...")
@@ -157,16 +175,18 @@ class LibraryTab(QWidget):
         self.playlists_songs.addLayout(self.playlist_songs_panel, 1)
         self.library_vlayout.addLayout(self.playlists_songs, 1)
         self.setLayout(self.library_vlayout)
-        
+
         self.current_playlist = None
         self._thumbnail_cache = {}
         self._thumbnail_items = {"playlists": {}}
 
     def select_load_account(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select Json with your account", "", "JSON Files (*.json)")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Json with your account", "", "JSON Files (*.json)"
+        )
         if file_path:
             self.load_account_requested.emit(file_path, True)
-            
+
     def select_user_playlist(self, item):
         playlist = item.data(Qt.UserRole)
         self.current_playlist = playlist
@@ -175,7 +195,7 @@ class LibraryTab(QWidget):
         self.play_shuffled_button.setEnabled(False)
         self.playlist_songs_model.set_songs([])
         self.playlist_content_selected.emit(playlist)
-    
+
     def play_playlist_song_at(self, index):
         if not index.isValid():
             return
@@ -183,7 +203,7 @@ class LibraryTab(QWidget):
         songs = self.playlist_songs_model.songs_list
         start_index = source_index.row()
         self.playlist_play_requested.emit(songs, start_index)
-    
+
     def display_playlists(self, playlist, file_path, succes):
         if succes:
             self.browser_route.setText(file_path)
@@ -194,7 +214,9 @@ class LibraryTab(QWidget):
                 playlist_item = QListWidgetItem(one_playlist["title"])
                 playlist_item.setData(Qt.UserRole, one_playlist)
                 self.user_playlists.addItem(playlist_item)
-                self._index_thumbnail_item(playlist_item, one_playlist, "playlistId", "playlists")
+                self._index_thumbnail_item(
+                    playlist_item, one_playlist, "playlistId", "playlists"
+                )
         else:
             self.browser_route.clear()
             self.sesion_status.setText("State: Error with account")
@@ -202,7 +224,7 @@ class LibraryTab(QWidget):
             self.playlist_search_box.clear()
             self.playlist_search_box.setEnabled(False)
             self.playlist_songs_model.set_songs([])
-    
+
     def display_playlist_songs(self, playlist_status, playlist_data):
         if playlist_status:
             self.playlist_songs_model.set_songs(playlist_data)
@@ -253,20 +275,26 @@ class LibraryTab(QWidget):
             for item in item_group.get(thumbnail_id, []):
                 item.setIcon(icon)
         self.playlist_songs_model.update_thumbnail(thumbnail_id, icon)
-    
+
     def playlist_context_menu(self, pos):
         index = self.user_playlists_songs.indexAt(pos)
         if index.isValid() and self.current_playlist:
             song_data = index.data(Qt.UserRole)
             menu = QMenu()
             delete_action = menu.addAction("Remove from playlist")
-            delete_action.triggered.connect(lambda: self.song_playlist_delete.emit(self.current_playlist.get("playlistId", ""), song_data))
+            delete_action.triggered.connect(
+                lambda: self.song_playlist_delete.emit(
+                    self.current_playlist.get("playlistId", ""), song_data
+                )
+            )
             menu.exec(self.user_playlists_songs.mapToGlobal(pos))
-    
+
     def create_browser(self):
         self.create_browser_requested.emit()
-    
+
     def download_playlist(self):
         if self.current_playlist:
             songs = self.playlist_songs_model.songs_list
-            self.playlist_download_requested.emit(songs, self.current_playlist.get("title", ""))
+            self.playlist_download_requested.emit(
+                songs, self.current_playlist.get("title", "")
+            )

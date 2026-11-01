@@ -1,6 +1,7 @@
 import threading
 from PySide6.QtCore import QObject, Signal
-import Motor
+import motor
+
 
 class SearchController(QObject):
     search_completed = Signal(object)
@@ -13,13 +14,11 @@ class SearchController(QObject):
 
     def search(self, query, search_version):
         threading.Thread(
-            target=self._run_search,
-            daemon=True,
-            args=(query, search_version)
+            target=self._run_search, daemon=True, args=(query, search_version)
         ).start()
 
     def _run_search(self, query, search_version):
-        res = Motor.search_bar(query)
+        res = motor.search_bar(query)
         if search_version == self.player_tab.search_version:
             self.search_completed.emit(res)
 
@@ -34,13 +33,11 @@ class SearchController(QObject):
         if len(song_data) == 1:
             video_id = song_data[0].get("id")
             threading.Thread(
-                target=self._run_similar_songs,
-                daemon=True,
-                args=(video_id,)
+                target=self._run_similar_songs, daemon=True, args=(video_id,)
             ).start()
 
     def _run_similar_songs(self, video_id):
-        songs = Motor.get_similar_songs(video_id)
+        songs = motor.get_similar_songs(video_id)
         for song in songs:
             if isinstance(song, dict):
                 self.thumbnail_fetcher.download_list_thumbnail(song)

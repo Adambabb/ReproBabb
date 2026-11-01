@@ -10,14 +10,14 @@ from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QSettings, QObject
 from PySide6.QtGui import QGuiApplication
 
-import PlayerTab, LibraryTab, DownloadTab
-import MiniPlayer
-import KeyboardControls
-import Player, Queue, DownloadQueue, Network
-from Controllers.DownloadController import DownloadController
-from Controllers.LibraryController import LibraryController
-from Controllers.SearchController import SearchController
-from Utils import resource_path
+import player_tab, library_tab, download_tab
+import mini_player
+import keyboard_controls
+import player, song_queue, download_queue, network
+from controllers.download_controller import DownloadController
+from controllers.library_controller import LibraryController
+from controllers.search_controller import SearchController
+from utils import resource_path
 
 
 class MainWindow(QObject):
@@ -28,7 +28,7 @@ class MainWindow(QObject):
         self.window.setWindowTitle("ReproBabb")
         self.window.setMinimumSize(640, 420)
 
-        icon_path = resource_path("Assets/ReproBabb.ico")
+        icon_path = resource_path("assets/ReproBabb.ico")
         app_icon = QIcon(icon_path)
         self.window.setWindowIcon(app_icon)
         self.app.setWindowIcon(app_icon)
@@ -37,21 +37,21 @@ class MainWindow(QObject):
         QCoreApplication.setOrganizationName("Reprobabb")
         QCoreApplication.setApplicationName("Reprobabb")
 
-        with open(resource_path("Styles/styles.qss"), "r") as f:
+        with open(resource_path("styles/styles.qss"), "r") as f:
             self.app.setStyleSheet(f.read())
 
         try:
-            self.player = Player.AudioController()
-        except Player.VlcNotAvailableError:
+            self.player = player.AudioController()
+        except player.VlcNotAvailableError:
             QMessageBox.critical(
                 self.window,
-                "Error de VLC",
+                "VLC not found",
                 "VLC was not found. ReproBabb needs VLC (64-bit) installed. You can download it from videolan.org.",
             )
             sys.exit(1)
-        self.queue = Queue.SongQueue(self.player)
-        self.download_queue = DownloadQueue.DownloadQueue()
-        self.thumbnail = Network.ThumbnailFetcher(self.queue)
+        self.queue = song_queue.SongQueue(self.player)
+        self.download_queue = download_queue.DownloadQueue()
+        self.thumbnail = network.ThumbnailFetcher(self.queue)
 
         self.song_timer = QTimer()
         self.song_timer.timeout.connect(self.update_timeline)
@@ -61,11 +61,11 @@ class MainWindow(QObject):
         self.refresh_download_timer.start(500)
 
         self.tab = QTabWidget()
-        self.player_tab = PlayerTab.PlayerTab()
-        self.library_tab = LibraryTab.LibraryTab()
-        self.download_tab = DownloadTab.DownloadTab()
-        self.keyboard_controls = KeyboardControls.KeyboardControls(self)
-        self.mini_player = MiniPlayer.MiniPlayer(self.queue.model)
+        self.player_tab = player_tab.PlayerTab()
+        self.library_tab = library_tab.LibraryTab()
+        self.download_tab = download_tab.DownloadTab()
+        self.keyboard_controls = keyboard_controls.KeyboardControls(self)
+        self.mini_player = mini_player.MiniPlayer(self.queue.model)
         self.mini_player.setWindowFlags(
             Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint
         )

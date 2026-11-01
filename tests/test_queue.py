@@ -1,7 +1,7 @@
 import pytest
 from PySide6.QtCore import QObject, Signal
 
-from Queue import SongQueue
+from song_queue import SongQueue
 
 
 class FakePlayer(QObject):

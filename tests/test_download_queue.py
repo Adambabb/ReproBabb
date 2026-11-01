@@ -1,4 +1,4 @@
-from DownloadQueue import DownloadQueue
+from download_queue import DownloadQueue
 
 
 def test_register_download_starts_pending():

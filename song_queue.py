@@ -9,7 +9,7 @@ from PySide6.QtCore import (
     QByteArray,
 )
 from PySide6.QtGui import QIcon, QPixmap
-import Motor
+import motor
 import threading
 import random
 import json
@@ -261,7 +261,7 @@ class SongQueue(QObject):
             self.fetch_version += 1
             current_fetch_version = self.fetch_version
         while song is not None:
-            status_fetch = Motor.fetch(song["id"])
+            status_fetch = motor.fetch(song["id"])
             with self.lock:
                 is_current_fetch = current_fetch_version == self.fetch_version
             if not is_current_fetch:

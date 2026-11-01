@@ -3,8 +3,9 @@ import json
 import threading
 from PySide6.QtCore import QObject, Signal, QStandardPaths
 from PySide6.QtWidgets import QDialog, QMessageBox
-import Motor
-import Login
+import motor
+import login
+
 
 class LibraryController(QObject):
     playlists_loaded = Signal(list, str, bool)
@@ -26,20 +27,22 @@ class LibraryController(QObject):
     def load_account(self, file_path, show_error=True):
         playlists = []
         success = False
-        if file_path and Motor.set_account(file_path):
+        if file_path and motor.set_account(file_path):
             self.settings.setValue("saved_session_path", file_path)
             success = True
-            playlists = Motor.get_user_playlist()
+            playlists = motor.get_user_playlist()
             self.player_tab.update_playlist(playlists)
             for pl in playlists:
                 self.thumbnail_fetcher.download_playlist_thumbnail(pl)
         elif show_error:
-            QMessageBox.critical(self.window, "Sesion Error", "Couldn't sign up or expired credentials.")
+            QMessageBox.critical(
+                self.window, "Sesion Error", "Couldn't sign up or expired credentials."
+            )
 
         self.library_tab.display_playlists(playlists, file_path, success)
 
     def create_browser_session(self):
-        login_dialog = Login.LoginDialog()
+        login_dialog = login.LoginDialog()
         if login_dialog.exec() == QDialog.Accepted:
             app_path = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
             os.makedirs(app_path, exist_ok=True)
@@ -51,26 +54,24 @@ class LibraryController(QObject):
     def fetch_playlist_songs(self, playlist):
         playlist_id = playlist.get("playlistId", "")
         threading.Thread(
-            target=self._run_fetch_playlist,
-            daemon=True,
-            args=(playlist_id,)
+            target=self._run_fetch_playlist, daemon=True, args=(playlist_id,)
         ).start()
 
     def _run_fetch_playlist(self, playlist_id):
-        data = Motor.playlist_data(playlist_id)
+        data = motor.playlist_data(playlist_id)
         status = bool(data and data[0].get("status") == "success")
         self.playlist_data_fetched.emit(status, data if status else [])
 
     def add_song_to_playlist(self, playlist_id, song_data):
         threading.Thread(
-            target=Motor.add_song_playlist,
+            target=motor.add_song_playlist,
             daemon=True,
-            args=(playlist_id, song_data.get("id", ""))
+            args=(playlist_id, song_data.get("id", "")),
         ).start()
 
     def remove_song_from_playlist(self, playlist_id, song_data):
         def _run():
-            res = Motor.remove_song_playlist(playlist_id, song_data)
+            res = motor.remove_song_playlist(playlist_id, song_data)
             if res.get("status") == "success":
                 self.fetch_playlist_songs({"playlistId": playlist_id})
 

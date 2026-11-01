@@ -1,9 +1,9 @@
-from Player import AudioController, VlcNotAvailableError
+from player import AudioController, VlcNotAvailableError
 from unittest.mock import MagicMock, patch
 import pytest
 
 
-@patch("Player.vlc")
+@patch("player.vlc")
 def test_audio_controller_states(mock_vlc):
     mock_vlc.State.Playing = "FAKE_VLC_STATE_PLAYING"
 
@@ -19,7 +19,7 @@ def test_audio_controller_states(mock_vlc):
     assert emitted_signals == ["Playing"]
 
 
-@patch("Player.vlc")
+@patch("player.vlc")
 def test_transition_finished(mock_vlc):
     mock_vlc.State.Ended = "FAKE_VLC_STATE_ENDED"
 
@@ -35,7 +35,7 @@ def test_transition_finished(mock_vlc):
     assert emitted_signals == ["Ended Media"]
 
 
-@patch("Player.vlc")
+@patch("player.vlc")
 def test_transition_finished_without_play(mock_vlc):
     mock_vlc.State.Ended = "FAKE_VLC_STATE_ENDED"
 
@@ -50,7 +50,7 @@ def test_transition_finished_without_play(mock_vlc):
     assert emitted_signals == ["Cannot Reproduce"]
 
 
-@patch("Player.vlc")
+@patch("player.vlc")
 def test_play_song(mock_vlc):
     player_AudioController = AudioController()
     fake_url = "http://fake-stream.com/audio.mp3"
@@ -61,7 +61,7 @@ def test_play_song(mock_vlc):
     player_AudioController.instance.media_new.assert_called_once_with(fake_url)
 
 
-@patch("Player.vlc")
+@patch("player.vlc")
 def test_pause_song(mock_vlc):
     player_AudioController = AudioController()
     player_AudioController.pause()
@@ -69,7 +69,7 @@ def test_pause_song(mock_vlc):
     player_AudioController.player.pause.assert_called_once()
 
 
-@patch("Player.vlc")
+@patch("player.vlc")
 def test_stop_song(mock_vlc):
     player_AudioController = AudioController()
     player_AudioController.stop()
@@ -77,7 +77,7 @@ def test_stop_song(mock_vlc):
     player_AudioController.player.stop.assert_called_once()
 
 
-@patch("Player.vlc")
+@patch("player.vlc")
 def test_set_volume(mock_vlc):
     player_AudioController = AudioController()
     new_volume = 75
@@ -91,7 +91,7 @@ def test_set_volume(mock_vlc):
     player_AudioController.player.audio_set_volume.assert_called_once_with(new_volume)
 
 
-@patch("Player.vlc")
+@patch("player.vlc")
 def test_toggle_pause_play(mock_vlc):
     player_AudioController = AudioController()
 
@@ -107,7 +107,7 @@ def test_toggle_pause_play(mock_vlc):
     player_AudioController.player.play.assert_called_once()
 
 
-@patch("Player.vlc")
+@patch("player.vlc")
 def test_set_actual_time(mock_vlc):
     player_AudioController = AudioController()
     new_time = 5000
@@ -116,13 +116,13 @@ def test_set_actual_time(mock_vlc):
     player_AudioController.player.set_time.assert_called_once_with(new_time)
 
 
-@patch("Player.vlc", None)
+@patch("player.vlc", None)
 def test_vlc_module_missing_raises_error():
     with pytest.raises(VlcNotAvailableError):
         AudioController()
 
 
-@patch("Player.vlc")
+@patch("player.vlc")
 def test_vlc_instance_raising_raises_error(mock_vlc):
     mock_vlc.Instance.side_effect = Exception("boom")
 
@@ -130,7 +130,7 @@ def test_vlc_instance_raising_raises_error(mock_vlc):
         AudioController()
 
 
-@patch("Player.vlc")
+@patch("player.vlc")
 def test_vlc_instance_none_raises_error(mock_vlc):
     mock_vlc.Instance.return_value = None
 

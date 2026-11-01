@@ -1,9 +1,24 @@
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLineEdit, QListWidget, QPushButton, QLabel, QSizePolicy, QMenu, QListWidgetItem, QFrame, QAbstractItemView, QListView
+from PySide6.QtWidgets import (
+    QWidget,
+    QHBoxLayout,
+    QVBoxLayout,
+    QLineEdit,
+    QListWidget,
+    QPushButton,
+    QLabel,
+    QSizePolicy,
+    QMenu,
+    QListWidgetItem,
+    QFrame,
+    QAbstractItemView,
+    QListView,
+)
 from PySide6.QtGui import QIcon, QPixmap, QColor, QShortcut, QKeySequence, QAction
 from PySide6.QtCore import QTimer, Qt, QPoint, Signal, QSize, QEvent
-import CustomWidgets
+import custom_widgets
 import os
-from Utils import resource_path
+from utils import resource_path
+
 
 class PlayerTab(QWidget):
     search_requested = Signal(str, int)
@@ -13,7 +28,7 @@ class PlayerTab(QWidget):
     next_requested = Signal()
     play_next_requested = Signal(dict)
     previous_requested = Signal()
-    shuffle_requested = Signal() 
+    shuffle_requested = Signal()
     volume_changed = Signal(int)
     time_changed = Signal(int)
     always_on_toggle = Signal(bool)
@@ -30,15 +45,17 @@ class PlayerTab(QWidget):
         self.search_version = 0
         vertical_layout = QVBoxLayout()
         search_settings_layout = QHBoxLayout()
-        
+
         self.search_box = QLineEdit()
         self.search_box.installEventFilter(self)
         self.download_song = QPushButton("Download Song")
-        self.download_song.clicked.connect(lambda: self.download_requested.emit(self.actual_song))
-        
+        self.download_song.clicked.connect(
+            lambda: self.download_requested.emit(self.actual_song)
+        )
+
         search_settings_layout.addWidget(self.download_song)
         search_settings_layout.addWidget(self.search_box)
-        
+
         self.search_timer = QTimer()
         self.hide_list_timer = QTimer()
         self.hide_list_timer.setSingleShot(True)
@@ -47,7 +64,7 @@ class PlayerTab(QWidget):
         self.search_timer.setSingleShot(True)
         self.search_box.textChanged.connect(lambda text: self.search_timer.start(300))
         self.search_box.returnPressed.connect(self.on_search_enter)
-        
+
         self.search_list = QListWidget(self)
         self.search_list.setIconSize(QSize(50, 50))
         self._thumbnail_cache = {}
@@ -58,7 +75,7 @@ class PlayerTab(QWidget):
         self.search_list.customContextMenuRequested.connect(self.context_menu)
         self.search_list.itemClicked.connect(self.select_song)
         self.search_list.raise_()
-        
+
         search_button = QPushButton("search")
         search_settings_layout.addWidget(search_button)
         search_button.clicked.connect(self.click_search)
@@ -68,10 +85,12 @@ class PlayerTab(QWidget):
         settings_button.setIcon(ico_settings)
         search_settings_layout.addWidget(settings_button)
         settings_button.clicked.connect(self.settings_menu)
-        
+
         self.thumbnail_label = QLabel()
         self.thumbnail_label.setScaledContents(True)
-        self.thumbnail_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.thumbnail_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         self.cover = QPixmap(self.program_location("Vinyl-Cover.png"))
         self.thumbnail_label.setPixmap(self.cover)
         self._song_thumbnail_cache = {}
@@ -90,7 +109,7 @@ class PlayerTab(QWidget):
         thumbnail_layout = QHBoxLayout()
         thumbnail_layout.addStretch()
         thumbnail_layout.addWidget(self.thumbnail_label)
-        
+
         actual_song = QFrame()
         self.actual_song = {}
         self.actual_song_title = QLabel("Nothing Playing")
@@ -112,9 +131,9 @@ class PlayerTab(QWidget):
         self.thumbnail_frame.setLayout(thumbnail_layout)
         self.thumbnail_frame.setObjectName("thumbnailFrame")
         vertical_layout.addWidget(self.thumbnail_frame, 6)
-        
+
         self.current_time_label = QLabel("00:00")
-        self.visualizer = CustomWidgets.TimeDesign(self.cover_color, 0, 0)
+        self.visualizer = custom_widgets.TimeDesign(self.cover_color, 0, 0)
         self.total_time_label = QLabel("00:00")
 
         time_layout = QHBoxLayout()
@@ -124,7 +143,9 @@ class PlayerTab(QWidget):
         vertical_layout.addLayout(time_layout)
         self.visualizer.time_changed.connect(self.update_current_time_new_slider)
 
-        self.volume_slider = CustomWidgets.VolumeDesign(self.program_location("Volume.png"))
+        self.volume_slider = custom_widgets.VolumeDesign(
+            self.program_location("Volume.png")
+        )
         volume_layout = QHBoxLayout()
         volume_layout.addWidget(self.volume_slider, 1)
         volume_layout.addWidget(self.add_to_playlist_button)
@@ -134,10 +155,10 @@ class PlayerTab(QWidget):
         vertical_layout.addWidget(self.status_label)
 
         controllers_layout = QHBoxLayout()
-        
+
         previous_song = QPushButton()
         previous_song.setIcon(QIcon(self.program_location("Previous.png")))
-        controllers_layout.addWidget(previous_song)   
+        controllers_layout.addWidget(previous_song)
         self.shortcut_previous_song = QShortcut(QKeySequence("Left"), self)
         self.shortcut_previous_song.activated.connect(self.previous_song_play)
         previous_song.clicked.connect(self.previous_song_play)
@@ -145,17 +166,17 @@ class PlayerTab(QWidget):
         self.pause = QPushButton()
         self.pause.setIcon(QIcon(self.program_location("Play.png")))
         controllers_layout.addWidget(self.pause)
-        self.pause.clicked.connect(self.toggle_play_pause)       
+        self.pause.clicked.connect(self.toggle_play_pause)
         self.shortcut_pause_play = QShortcut(QKeySequence("Space"), self)
         self.shortcut_pause_play.activated.connect(self.toggle_play_pause)
-        
+
         next_song = QPushButton()
-        next_song.setIcon(QIcon(self.program_location("Next.png")))        
+        next_song.setIcon(QIcon(self.program_location("Next.png")))
         controllers_layout.addWidget(next_song)
         self.shortcut_next_song = QShortcut(QKeySequence("Right"), self)
         self.shortcut_next_song.activated.connect(self.next_song_play)
         next_song.clicked.connect(self.next_song_play)
-        
+
         self.shuffle_button = QPushButton()
         self.shuffle_button.setCheckable(True)
         self.shuffle_button.setIcon(QIcon(self.program_location("Shuffle.png")))
@@ -165,7 +186,7 @@ class PlayerTab(QWidget):
         mini_player_button = QPushButton("Mini Player")
         mini_player_button.clicked.connect(self.mini_player_requested.emit)
         controllers_layout.addWidget(mini_player_button)
-                
+
         vertical_layout.addLayout(controllers_layout, 1)
         self.is_link_search = False
 
@@ -175,18 +196,20 @@ class PlayerTab(QWidget):
         self.visible.setChecked(True)
         self.settings.addAction(self.visible)
         self.visible.toggled.connect(self.always_on_toggle.emit)
-        
+
         self.general_layout = QHBoxLayout()
         self.general_layout.addLayout(vertical_layout, 3)
-        
+
         self.vertical_queue_layout = QVBoxLayout()
         self.vertical_queue_layout.addLayout(search_settings_layout)
-        
+
         self.vertical_queue_place = QLabel("Queue in work")
         self.vertical_queue_layout.addWidget(self.vertical_queue_place)
-        
+
         self.queue_list = QListView(self)
-        self.queue_list.setItemDelegate(CustomWidgets.SongItemDelegate(self.queue_list))
+        self.queue_list.setItemDelegate(
+            custom_widgets.SongItemDelegate(self.queue_list)
+        )
         self.queue_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self.queue_list.setDragEnabled(True)
         self.queue_list.setAcceptDrops(True)
@@ -200,10 +223,12 @@ class PlayerTab(QWidget):
         self.general_layout.addLayout(self.vertical_queue_layout, 2)
         self.setLayout(self.general_layout)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.queue_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.queue_list.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
 
     def program_location(self, asset_name):
-        return resource_path(os.path.join("Assets", asset_name))
+        return resource_path(os.path.join("assets", asset_name))
 
     def click_search(self):
         search = self.search_box.text()
@@ -217,7 +242,12 @@ class PlayerTab(QWidget):
     def search_result(self, res):
         self.search_list.clear()
         self._thumbnail_items["search"].clear()
-        self.search_list.setGeometry(self.search_box.x(), self.search_box.y() + self.search_box.height(), self.search_box.width(), 200)
+        self.search_list.setGeometry(
+            self.search_box.x(),
+            self.search_box.y() + self.search_box.height(),
+            self.search_box.width(),
+            200,
+        )
         self.search_list.raise_()
         if self.is_link_search:
             if isinstance(res, list) and res and res[0]["status"] != "error":
@@ -229,13 +259,19 @@ class PlayerTab(QWidget):
         else:
             for song in res:
                 if isinstance(song, dict) and song.get("status") == "success":
-                    artists = ", ".join(artist['name'] for artist in song['artists']) if isinstance(song['artists'], list) else song['artists']
+                    artists = (
+                        ", ".join(artist["name"] for artist in song["artists"])
+                        if isinstance(song["artists"], list)
+                        else song["artists"]
+                    )
                     search_list_element = QListWidgetItem()
                     search_list_element.setData(Qt.UserRole, song)
                     self.search_list.addItem(search_list_element)
-                    search_row_element = CustomWidgets.search_row(song, artists)
+                    search_row_element = custom_widgets.search_row(song, artists)
                     search_list_element.setSizeHint(search_row_element.sizeHint())
-                    self.search_list.setItemWidget(search_list_element, search_row_element)
+                    self.search_list.setItemWidget(
+                        search_list_element, search_row_element
+                    )
                     self._index_thumbnail_item(search_list_element, song, "search")
             self.search_list.setVisible((self.search_list.count() > 0))
 
@@ -255,7 +291,14 @@ class PlayerTab(QWidget):
         self.setFocus()
 
     def settings_menu(self):
-        self.settings.exec(self.mapToGlobal(QPoint(self.width() // 2 - self.settings.sizeHint().width() // 2, self.height() // 2 - self.settings.sizeHint().height() // 2)))
+        self.settings.exec(
+            self.mapToGlobal(
+                QPoint(
+                    self.width() // 2 - self.settings.sizeHint().width() // 2,
+                    self.height() // 2 - self.settings.sizeHint().height() // 2,
+                )
+            )
+        )
 
     def update_thumbnail(self, data, song_id=None):
         current_song_id = self.actual_song.get("id") or self.actual_song.get("videoId")
@@ -291,7 +334,9 @@ class PlayerTab(QWidget):
         title = song.get("title", "Unknown Title")
         artists = song.get("artists", "")
         if isinstance(artists, list):
-            artists = ", ".join(a.get("name", "") if isinstance(a, dict) else str(a) for a in artists)
+            artists = ", ".join(
+                a.get("name", "") if isinstance(a, dict) else str(a) for a in artists
+            )
         self.actual_song_title.setText(title)
         self.actual_song_artist.setText(str(artists))
         song_id = song.get("id") or song.get("videoId")
@@ -300,9 +345,7 @@ class PlayerTab(QWidget):
         if song_id in self._song_thumbnail_cache:
             self.update_thumbnail(self._song_thumbnail_cache[song_id], song_id)
         else:
-            self._apply_cover(
-                QPixmap(self.program_location("Vinyl-Cover.png"))
-            )
+            self._apply_cover(QPixmap(self.program_location("Vinyl-Cover.png")))
         self.add_to_playlist_button.setEnabled(
             bool(song.get("id") and self.available_playlists)
         )
@@ -310,7 +353,7 @@ class PlayerTab(QWidget):
         if self.queue_list.model():
             songs_list = self.queue_list.model().songs_list
             song_id = song.get("id") or song.get("videoId")
-            
+
             for row, item in enumerate(songs_list):
                 item_id = item.get("id") or item.get("videoId")
                 if item_id and item_id == song_id:
@@ -341,11 +384,11 @@ class PlayerTab(QWidget):
             if not self.visualizer.is_dragging:
                 self.visualizer.song_current_time = current_player_time
                 self.visualizer.update()
-                
+
             current_mins = (current_player_time // 1000) // 60
             current_secs = (current_player_time // 1000) % 60
             self.current_time_label.setText(f"{current_mins:02d}:{current_secs:02d}")
-            
+
             total_mins = (player_duration // 1000) // 60
             total_secs = (player_duration // 1000) % 60
             self.total_time_label.setText(f"{total_mins:02d}:{total_secs:02d}")
@@ -356,13 +399,24 @@ class PlayerTab(QWidget):
             song_data = selected_song.data(Qt.UserRole)
             menu = QMenu()
             play_next_action = menu.addAction("Play Next")
-            play_next_action.triggered.connect(lambda: (self.play_next_requested.emit(song_data), self.search_list.hide()))
+            play_next_action.triggered.connect(
+                lambda: (
+                    self.play_next_requested.emit(song_data),
+                    self.search_list.hide(),
+                )
+            )
             add_song_playlist = menu.addMenu("Add to playlist")
             download_selected_song = menu.addAction("Download")
-            download_selected_song.triggered.connect(lambda: self.download_requested.emit(song_data))
+            download_selected_song.triggered.connect(
+                lambda: self.download_requested.emit(song_data)
+            )
             for playlist in self.available_playlists:
                 playlist_to_select = add_song_playlist.addAction(playlist["title"])
-                playlist_to_select.triggered.connect(lambda checked=False, p=playlist["playlistId"], s=song_data: self.added_playlist.emit(p, s))                
+                playlist_to_select.triggered.connect(
+                    lambda checked=False, p=playlist[
+                        "playlistId"
+                    ], s=song_data: self.added_playlist.emit(p, s)
+                )
             menu_pos = self.search_list.mapToGlobal(pos)
             self.hide_list_timer.stop()
             menu.exec(menu_pos)
@@ -395,8 +449,9 @@ class PlayerTab(QWidget):
                 continue
             action = menu.addAction(playlist.get("title", "Untitled Playlist"))
             action.triggered.connect(
-                lambda checked=False, target=playlist_id, current_song=song:
-                self.added_playlist.emit(target, current_song)
+                lambda checked=False, target=playlist_id, current_song=song: self.added_playlist.emit(
+                    target, current_song
+                )
             )
         return menu
 
@@ -419,7 +474,9 @@ class PlayerTab(QWidget):
         return super().eventFilter(obj, event)
 
     def _index_thumbnail_item(self, item, song, list_name):
-        thumbnail_id = song.get("videoId") or song.get("id") if isinstance(song, dict) else None
+        thumbnail_id = (
+            song.get("videoId") or song.get("id") if isinstance(song, dict) else None
+        )
         if not thumbnail_id:
             return
         thumbnail_id = str(thumbnail_id)
@@ -460,20 +517,29 @@ class PlayerTab(QWidget):
             song_data = index.data(Qt.UserRole)
             menu = QMenu()
             play_next_action = menu.addAction("Play Next")
-            play_next_action.triggered.connect(lambda: self.play_next_requested.emit(song_data))
+            play_next_action.triggered.connect(
+                lambda: self.play_next_requested.emit(song_data)
+            )
             add_song_playlist = menu.addMenu("Add to playlist")
             download_selected_song = menu.addAction("Download")
-            download_selected_song.triggered.connect(lambda: self.download_requested.emit(song_data))
+            download_selected_song.triggered.connect(
+                lambda: self.download_requested.emit(song_data)
+            )
             remove_song = menu.addAction("Remove from Queue")
             remove_song.triggered.connect(lambda: self.remove_queue.emit(index.row()))
             remove_from_playlist = menu.addAction("Remove from Current Playlist")
             remove_from_playlist.triggered.connect(
-                lambda checked=False, song=song_data:
-                self.remove_from_playlist_requested.emit(song)
+                lambda checked=False, song=song_data: self.remove_from_playlist_requested.emit(
+                    song
+                )
             )
-            
+
             for playlist in self.available_playlists:
                 playlist_to_select = add_song_playlist.addAction(playlist["title"])
-                playlist_to_select.triggered.connect(lambda checked=False, p=playlist["playlistId"], s=song_data: self.added_playlist.emit(p, s))                
-            
+                playlist_to_select.triggered.connect(
+                    lambda checked=False, p=playlist[
+                        "playlistId"
+                    ], s=song_data: self.added_playlist.emit(p, s)
+                )
+
             menu.exec(self.queue_list.mapToGlobal(pos))
