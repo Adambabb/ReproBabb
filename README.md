@@ -14,9 +14,10 @@ Audio plays through VLC via `python-vlc`, downloads go through `yt-dlp`, and You
 5. [Project Structure](#project-structure)
 6. [Performance Optimizations (Model/View)](#performance-optimizations-modelview)
 7. [Data Flow & Concurrency](#data-flow--concurrency)
-8. [Known Limitations](#known-limitations)
-9. [Troubleshooting](#troubleshooting)
-10. [Third-Party Software & Licenses](#third-party-software--licenses)
+8. [Testing](#testing)
+9. [Known Limitations](#known-limitations)
+10. [Troubleshooting](#troubleshooting)
+11. [Third-Party Software & Licenses](#third-party-software--licenses)
 
 ---
 
@@ -27,6 +28,7 @@ Audio plays through VLC via `python-vlc`, downloads go through `yt-dlp`, and You
 * **Virtualized Playback Queue**:
   * Jump directly between songs by clicking.
   * Native reordering via **Drag & Drop**, including while shuffle is active.
+  * Remove songs from the queue, including the one currently playing (playback continues with the next song, or stops if it was the last one).
   * **Shuffle** Mode: Randomizes playback order while keeping the currently playing song first when shuffle is toggled on.
   * **Play Next** from the context menu.
 * **Similar Songs**: Selecting a single song starts a queue of similar tracks.
@@ -76,7 +78,7 @@ python main.py
 
 1. **Search & Playback**: Enter a song or artist name in the search bar above the queue. Click a result to begin playback; selecting one result also fetches similar tracks for the queue. You can also paste a YouTube / YouTube Music video or playlist link to play it directly.
 2. **Playlist Search & Shuffle**: In **Library**, select a playlist to search its tracks or choose **Play Shuffled**.
-3. **Queue Actions**: Right-click a queue or search-result track for available actions such as **Play Next**, **Add to playlist**, and **Download**. Queue tracks can be reordered with drag and drop. The **+** button next to the volume control adds the current song to one of your playlists.
+3. **Queue Actions**: Right-click a queue or search-result track for available actions such as **Play Next**, **Add to playlist**, **Download** and **Remove from Queue**. Queue tracks can be reordered with drag and drop. The **+** button next to the volume control adds the current song to one of your playlists.
 4. **Mini Player**: Select **Mini Player** in the main player. The main window is hidden until you choose **Full** or close the mini-player.
 5. **Downloads**: The first time you download something, you are asked for a destination folder. Use **Change Download Folder** in the Downloads tab to change it later. Monitor progress and cancel pending or active jobs with the **X** button.
 6. **Always Visible**: Click the settings button in the player to toggle keeping the window on top.
@@ -101,7 +103,7 @@ The app remembers the session file and loads it automatically on the next launch
 | `Media Play/Pause` key | Play / Pause | Global |
 | `Media Next` key | Next track | Global |
 
-> **Privacy note:** The media keys work even when the app is not focused. To achieve this, `KeyboardControls` uses `pynput` to register a system-wide keyboard listener. The code only reacts to the two media keys above and does not store or transmit any other keystroke.
+> **Privacy note:** The media keys work even when the app is not focused. To achieve this, `KeyboardControls` (`keyboard_controls.py`) uses `pynput` to register a system-wide keyboard listener. The code only reacts to the two media keys above and does not store or transmit any other keystroke.
 
 ---
 
@@ -120,7 +122,7 @@ graph TD
     main --> MP[MiniPlayer]
     main --> KC[KeyboardControls]
     main --> P[Player]
-    main --> Q[Queue]
+    main --> Q[SongQueue]
     main --> DQ[DownloadQueue]
     main --> N[Network]
     SC --> M[Motor]
@@ -144,21 +146,21 @@ graph TD
 | Module | Responsibility |
 | --- | --- |
 | **`main.py`** | Application entry point. Instantiates the window, tabs, and controllers, and connects global signals/slots and timers. |
-| **`Controllers/SearchController.py`** | Handles background search threads, result version filtering, similar-track lookup, and thumbnail requests for the results. |
-| **`Controllers/LibraryController.py`** | Manages user session loading, asynchronous playlist fetching, and playlist track modifications. |
-| **`Controllers/DownloadController.py`** | Coordinates background single-track and playlist download threads, cancellation, and the configured download folder. |
-| **`Motor.py`** | Data layer with no Qt dependencies. Direct wrapper for `ytmusicapi` and `yt_dlp`. |
-| **`Player.py`** | Wrapper around `python-vlc`. Manages playback states, track length, and playback position. |
-| **`Queue.py`** | Queue business logic (`SongQueue`) and the list data model (`QueueModel` inheriting from `QAbstractListModel`). |
-| **`DownloadQueue.py`** | Thread-safe state holder (`threading.Lock`) for active downloads, progress percentages, and cancellation flags. |
-| **`PlayerTab.py` / `LibraryTab.py` / `DownloadTab.py`** | Views and UI components for the three main tabs. |
-| **`MiniPlayer.py`** | Compact always-on-top player window sharing the playback queue and controls. |
-| **`KeyboardControls.py`** | Global listener (`pynput`) for the media play/pause and media next keys. |
-| **`Network.py`** | Asynchronous thumbnail downloader: a `ThreadPoolExecutor` for list thumbnails (with loaded/pending tracking to avoid duplicate requests) and plain threads for cover art. |
-| **`CustomWidgets.py`** | Lightweight pixel-level delegate (`SongItemDelegate`) and custom widgets (`TimeDesign`, `VolumeDesign`). |
-| **`Login.py`** | Web engine dialog (`QWebEngineView`) used to capture the Google session cookie. |
-| **`Utils.py`** | Utility function `resource_path()` for resolving resource paths in both source code and PyInstaller executable builds. |
-| **`Styles/styles.qss`** | Global QSS stylesheet for application styling. |
+| **`controllers/search_controller.py`** | Handles background search threads, result version filtering, similar-track lookup, and thumbnail requests for the results. |
+| **`controllers/library_controller.py`** | Manages user session loading, asynchronous playlist fetching, and playlist track modifications. |
+| **`controllers/download_controller.py`** | Coordinates background single-track and playlist download threads, cancellation, and the configured download folder. |
+| **`motor.py`** | Data layer with no Qt dependencies. Direct wrapper for `ytmusicapi` and `yt_dlp`. |
+| **`player.py`** | Wrapper around `python-vlc`. Manages playback states, track length, and playback position. Raises `VlcNotAvailableError` when VLC cannot be loaded. |
+| **`song_queue.py`** | Queue business logic (`SongQueue`) and the list data model (`QueueModel` inheriting from `QAbstractListModel`). |
+| **`download_queue.py`** | Thread-safe state holder (`threading.Lock`) for active downloads, progress percentages, and cancellation flags. |
+| **`player_tab.py` / `library_tab.py` / `download_tab.py`** | Views and UI components for the three main tabs. |
+| **`mini_player.py`** | Compact always-on-top player window sharing the playback queue and controls. |
+| **`keyboard_controls.py`** | Global listener (`pynput`) for the media play/pause and media next keys. |
+| **`network.py`** | Asynchronous thumbnail downloader: a `ThreadPoolExecutor` for list thumbnails (with loaded/pending tracking to avoid duplicate requests) and plain threads for cover art. |
+| **`custom_widgets.py`** | Lightweight pixel-level delegate (`SongItemDelegate`) and custom widgets (`TimeDesign`, `VolumeDesign`). |
+| **`login.py`** | Web engine dialog (`QWebEngineView`) used to capture the Google session cookie. |
+| **`utils.py`** | Utility function `resource_path()` for resolving resource paths in both source code and PyInstaller executable builds. |
+| **`styles/styles.qss`** | Global QSS stylesheet for application styling. |
 
 ---
 
@@ -167,28 +169,35 @@ graph TD
 ```
 ReproBabb/
 ├── main.py
-├── Controllers/
-│   ├── DownloadController.py
-│   ├── LibraryController.py
-│   └── SearchController.py
-├── MiniPlayer.py
-├── KeyboardControls.py
-├── PlayerTab.py
-├── LibraryTab.py
-├── DownloadTab.py
-├── Player.py
-├── Queue.py
-├── DownloadQueue.py
-├── Motor.py
-├── Network.py
-├── CustomWidgets.py
-├── Login.py
-├── Utils.py
-├── Styles/
+├── controllers/
+│   ├── download_controller.py
+│   ├── library_controller.py
+│   └── search_controller.py
+├── mini_player.py
+├── keyboard_controls.py
+├── player_tab.py
+├── library_tab.py
+├── download_tab.py
+├── player.py
+├── song_queue.py
+├── download_queue.py
+├── motor.py
+├── network.py
+├── custom_widgets.py
+├── login.py
+├── utils.py
+├── styles/
 │   └── styles.qss
-├── Assets/               # Icons and default album cover image
+├── assets/               # Icons and default album cover image
+├── tests/
+│   ├── test_download_queue.py
+│   ├── test_motor.py
+│   ├── test_player.py
+│   └── test_queue.py
 ├── ReproBabb.spec        # PyInstaller build configuration
+├── pytest.ini
 ├── requirements.txt
+├── requirements-dev.txt
 └── LICENSE
 ```
 
@@ -199,10 +208,10 @@ ReproBabb/
 To reduce UI freezes and CPU/memory overhead when loading large song collections (such as playlists with hundreds of tracks), the application uses a virtualized architecture:
 
 1. **`QListView` + `QAbstractListModel`**:
-   * `QueueModel` (`Queue.py`), `PlaylistSongsModel` (`LibraryTab.py`) and `DownloadModel` (`DownloadTab.py`) manage internal data structures.
+   * `QueueModel` (`song_queue.py`), `PlaylistSongsModel` (`library_tab.py`) and `DownloadModel` (`download_tab.py`) manage internal data structures.
    * Row insertion, removal, and reordering use granular Qt methods (`beginInsertRows`, `beginRemoveRows`, `beginMoveRows`) to update views without rebuilding the entire list. Loading a whole new playlist resets the model.
 
-2. **Pixel-Level Render Delegates (`SongItemDelegate` in `CustomWidgets.py`, `DownloadItemDelegate` in `DownloadTab.py`)**:
+2. **Pixel-Level Render Delegates (`SongItemDelegate` in `custom_widgets.py`, `DownloadItemDelegate` in `download_tab.py`)**:
    * Instead of instantiating hundreds of heavy `QWidget` rows (`QFrame`, `QLabel`, etc.), the delegates render only visible rows directly on screen using `QPainter`.
    * Uses `QFontMetrics.elidedText` to dynamically truncate long titles or artist names with `"..."` when exceeding visible bounds.
 
@@ -210,7 +219,7 @@ To reduce UI freezes and CPU/memory overhead when loading large song collections
    * `QueueModel` implements native drag & drop reordering using a custom MIME type (`application/x-reprobabb-song-row`). Dragging rows alters the internal memory list without reconstructing UI widgets.
 
 4. **Thumbnail Caching**:
-   * `Network.py` tracks which list thumbnails are already loaded or pending, so the same cover is not requested twice.
+   * `network.py` tracks which list thumbnails are already loaded or pending, so the same cover is not requested twice.
    * The models keep a `_thumbnail_cache` mapping icons to track IDs, so cover art stays visible when reordering or moving items.
 
 ---
@@ -219,7 +228,30 @@ To reduce UI freezes and CPU/memory overhead when loading large song collections
 
 * **Background Threads (`threading.Thread` & `ThreadPoolExecutor`)**: Search, playback URL resolution, playlist-content fetching, thumbnail downloads, and media downloads run outside the main GUI thread. Account/session loading also makes synchronous API calls. Background results that update Qt views are passed through Qt signals (`PySide6.QtCore.Signal`).
 * **Timer Polling**: Rapidly changing UI elements (such as the playback timeline or download progress bars) poll state data via `QTimer` instances rather than emitting hundreds of signals per second, keeping event queues responsive.
-* **Download Cancellation**: `yt-dlp` jobs check `is_cancelled_fn` in the progress hook and raise `DownloadCancelled` at the next hook callback. Jobs cancelled while pending do not start.
+* **Download Progress & Cancellation**: `yt-dlp` jobs report progress through a hook that uses the exact total size when available and falls back to `yt-dlp`'s estimate. The same hook checks `is_cancelled_fn` and raises `DownloadCancelled` at the next callback. Jobs cancelled while pending do not start.
+* **Queue State**: `SongQueue` protects its indices with a lock. When the currently playing song is removed, the next one starts immediately and the index stays consistent in both normal and shuffle modes.
+
+---
+
+## Testing
+
+The core logic is covered by unit tests written with [pytest](https://docs.pytest.org/). None of them needs VLC, a network connection or a running Qt application window:
+
+| Test file | What it covers |
+| --- | --- |
+| `tests/test_download_queue.py` | Download registration, progress/status updates, cancellation and the pending-cancelled rule. |
+| `tests/test_motor.py` | `ytmusicapi` and `yt-dlp` wrappers with mocks, URL handling and the download progress hook. |
+| `tests/test_player.py` | Playback state handling with a mocked `vlc`, including the "VLC not available" errors. |
+| `tests/test_queue.py` | `SongQueue`: indices, shuffle, adding, reordering and removing songs (using a fake player). |
+
+To run them:
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+The user interface (tabs, mini player, delegates) is not covered by automated tests.
 
 ---
 
@@ -229,6 +261,9 @@ To reduce UI freezes and CPU/memory overhead when loading large song collections
 * **Fragile streaming**: Playback and downloads rely on `yt-dlp` and on YouTube's internal clients (`android` / `ios`), which can stop working when YouTube changes its APIs. Updating `yt-dlp` and `ytmusicapi` usually fixes it.
 * **Download format**: The format is chosen by `yt-dlp`; MP3 conversion is not configured.
 * **Session storage**: The library session is based on browser cookies stored in `browser.json` and may expire.
+* **No repeat mode**: Playback stops after the last song of the queue.
+* **Shuffle order**: After dragging songs while shuffle is active, the queue keeps the order you left it in. Turning shuffle off does not restore the original playlist order.
+* **Repeated songs**: If the same song appears more than once in the queue, it is identified by its ID when reordering, so the wrong copy may be treated as the current one.
 * **Platform**: Developed for Windows. Other platforms are untested.
 
 ---
@@ -273,6 +308,7 @@ VLC is a trademark of the VideoLAN project. ReproBabb is not affiliated with or 
 | **yt-dlp** | Audio extraction and downloads | Unlicense |
 | **ytmusicapi** | YouTube Music data | MIT |
 | **pynput** | Global media-key listener | LGPL v3 |
+| **pytest** (development only) | Unit tests | MIT |
 
 Each package is distributed under its own license; check the respective project for the exact terms of the version you use.
 
