@@ -220,3 +220,36 @@ __marimo__/
 
 #Account json
 browser.json
+
+
+# --- ReproBabb ---
+
+# Releases generados (se suben como adjunto en GitHub, no al repo)
+*.zip
+*.7z
+*.exe
+*.msi
+Output/
+
+# Audio descargado durante las pruebas
+*.mp3
+*.m4a
+*.webm
+*.opus
+*.ogg
+*.part
+*.ytdl
+
+# Credenciales / sesión de Google (cookies): nunca al repo
+browser.json
+*browser*.json
+oauth.json
+headers_auth.json
+
+# Editores y sistema
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtGui import QIcon, QPalette, QPixmap, QColor
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QSettings, QObject
 from PySide6.QtGui import QGuiApplication
 
@@ -36,6 +36,17 @@ class MainWindow(QObject):
         self.settings = QSettings("Reprobabb", "Reprobabb")
         QCoreApplication.setOrganizationName("Reprobabb")
         QCoreApplication.setApplicationName("Reprobabb")
+
+        palette = self.app.palette()
+        for role in (
+            QPalette.ColorRole.WindowText,
+            QPalette.ColorRole.Text,
+            QPalette.ColorRole.ButtonText,
+            QPalette.ColorRole.ToolTipText,
+            QPalette.ColorRole.HighlightedText,
+        ):
+            palette.setColor(role, QColor("#f5f5f5"))
+        self.app.setPalette(palette)
 
         with open(resource_path("styles/styles.qss"), "r") as f:
             self.app.setStyleSheet(f.read())
