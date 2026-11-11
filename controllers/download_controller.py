@@ -59,6 +59,29 @@ class DownloadController(QObject):
         except Exception as e:
             self.error_download.emit(str(e))
 
+    def _run_download(self, song_id, destination, download_id):
+        if not self.download_queue.start_download(download_id):
+            return
+        res = motor.fetch(
+            song_id,
+            download=True,
+            destination=destination,
+            is_cancelled_fn=lambda: self.download_queue.is_cancelled(download_id),
+            update_progress_fn=lambda pct: self.download_queue.update_progress(
+                download_id, pct
+            ),
+        )
+        status = (
+            "finished"
+            if res["status"] == "success"
+            else (
+                "cancelled"
+                if self.download_queue.is_cancelled(download_id)
+                else "error"
+            )
+        )
+        self.download_queue.update_status(download_id, status)
+
     @staticmethod
     def _safe_playlist_folder_name(playlist_name):
         safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(playlist_name))
