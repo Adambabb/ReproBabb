@@ -8,7 +8,7 @@ import login
 
 
 class LibraryController(QObject):
-    playlists_loaded = Signal(list, str, bool)
+    playlists_loaded = Signal(list, str, bool, bool)
     playlist_data_fetched = Signal(bool, list)
 
     def __init__(self, settings, library_tab, player_tab, thumbnail_fetcher, window):
@@ -18,6 +18,7 @@ class LibraryController(QObject):
         self.player_tab = player_tab
         self.thumbnail_fetcher = thumbnail_fetcher
         self.window = window
+        self.playlists_loaded.connect(self.on_playlists_loaded)
 
     def try_auto_login(self):
         saved_path = self.settings.value("saved_session_path", "")
@@ -25,20 +26,36 @@ class LibraryController(QObject):
             self.load_account(saved_path, show_error=False)
 
     def load_account(self, file_path, show_error=True):
+        self.library_tab.sesion_status.setText("State: Loading...")
+        get_account_thread = threading.Thread(
+            target=self.run_load_account, daemon=True, args=(file_path, show_error)
+        )
+        get_account_thread.start()
+
+    def run_load_account(self, file_path, show_error):
         playlists = []
         success = False
-        if file_path and motor.set_account(file_path):
+        try:
+            if file_path and motor.set_account(file_path):
+                playlists = motor.get_user_playlist()
+                success = True
+        except Exception as e:
+            print(f"Error cargando la cuenta: {e}")
+            playlists = []
+            success = False
+        finally:
+            self.playlists_loaded.emit(playlists, file_path, success, show_error)
+
+    def on_playlists_loaded(self, playlists, file_path, success, show_error):
+        if file_path and success:
             self.settings.setValue("saved_session_path", file_path)
-            success = True
-            playlists = motor.get_user_playlist()
             self.player_tab.update_playlist(playlists)
             for pl in playlists:
                 self.thumbnail_fetcher.download_playlist_thumbnail(pl)
-        elif show_error:
+        elif show_error and not success:
             QMessageBox.critical(
                 self.window, "Sesion Error", "Couldn't sign up or expired credentials."
             )
-
         self.library_tab.display_playlists(playlists, file_path, success)
 
     def create_browser_session(self):
