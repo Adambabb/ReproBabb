@@ -79,6 +79,8 @@ def song_link_data(song_link_id):
         except Exception as e:
             error_message = str(e)
             print(error_message)
+            formatted_song = music_data(None)
+            return formatted_song
     else:
         formatted_song = music_data(None)
         return formatted_song
