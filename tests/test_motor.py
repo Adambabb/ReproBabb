@@ -134,6 +134,21 @@ def test_song_link_data_not_found(mock_searcher):
 
 
 @patch("motor.searcher")
+@patch("motor.music_data")
+def test_song_link_data_music_data_error(mock_music, mock_searcher):
+    mock_searcher.get_song.return_value = {"title": "Link Song", "videoId": "v10"}
+    mock_music.side_effect = [
+        Exception("Invalid data"),
+        {"status": "error", "title": "Not found"},
+    ]
+    song = motor.song_link_data("v10")
+
+    assert song["status"] == "error"
+    assert mock_music.call_count == 2
+    mock_music.assert_called_with(None)
+
+
+@patch("motor.searcher")
 def test_add_song_playlist_success(mock_searcher):
     res = motor.add_song_playlist("PL123", "v1")
     assert res == {"status": "success"}
