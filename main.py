@@ -107,7 +107,10 @@ class MainWindow(QObject):
             self.thumbnail,
             self.window,
         )
+        self.library_ctrl.error_load_account.connect(self.player_tab.show_error)
         self.search_ctrl = SearchController(self.player_tab, self.thumbnail)
+        self.search_ctrl.error_search.connect(self.player_tab.show_error)
+        self.download_ctrl.error_download.connect(self.player_tab.show_error)
         self.download_tab.download_path_requested.connect(
             self.download_ctrl.choose_download_path
         )

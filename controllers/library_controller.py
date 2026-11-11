@@ -10,6 +10,7 @@ import login
 class LibraryController(QObject):
     playlists_loaded = Signal(list, str, bool, bool)
     playlist_data_fetched = Signal(bool, list)
+    error_load_account = Signal(str)
 
     def __init__(self, settings, library_tab, player_tab, thumbnail_fetcher, window):
         super().__init__()
@@ -40,9 +41,9 @@ class LibraryController(QObject):
                 playlists = motor.get_user_playlist()
                 success = True
         except Exception as e:
-            print(f"Error cargando la cuenta: {e}")
             playlists = []
             success = False
+            self.error_load_account.emit(str(e))
         finally:
             self.playlists_loaded.emit(playlists, file_path, success, show_error)
 
@@ -75,9 +76,15 @@ class LibraryController(QObject):
         ).start()
 
     def _run_fetch_playlist(self, playlist_id):
-        data = motor.playlist_data(playlist_id)
-        status = bool(data and data[0].get("status") == "success")
-        self.playlist_data_fetched.emit(status, data if status else [])
+        status = False
+        data = []
+        try:
+            data = motor.playlist_data(playlist_id)
+            status = bool(data and data[0].get("status") == "success")
+        except Exception as e:
+            self.error_load_account.emit(str(e))
+        finally:
+            self.playlist_data_fetched.emit(status, data)
 
     def add_song_to_playlist(self, playlist_id, song_data):
         threading.Thread(

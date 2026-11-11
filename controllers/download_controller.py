@@ -8,6 +8,7 @@ import motor
 
 class DownloadController(QObject):
     download_path_changed = Signal(str)
+    error_download = Signal(str)
 
     def __init__(self, settings, download_queue, window):
         super().__init__()
@@ -35,11 +36,6 @@ class DownloadController(QObject):
         if not destination:
             return
 
-        playlist_folder = os.path.join(
-            destination, self._safe_playlist_folder_name(playlist_name)
-        )
-        os.makedirs(playlist_folder, exist_ok=True)
-
         songs_with_ids = [
             (song, self.download_queue.register_download(song.get("title", "")))
             for song in songs
@@ -48,32 +44,20 @@ class DownloadController(QObject):
         thread = threading.Thread(
             target=self._run_playlist_download,
             daemon=True,
-            args=(playlist_folder, songs_with_ids),
+            args=(destination, playlist_name, songs_with_ids),
         )
         thread.start()
 
-    def _run_download(self, song_id, destination, download_id):
-        if not self.download_queue.start_download(download_id):
-            return
-        res = motor.fetch(
-            song_id,
-            download=True,
-            destination=destination,
-            is_cancelled_fn=lambda: self.download_queue.is_cancelled(download_id),
-            update_progress_fn=lambda pct: self.download_queue.update_progress(
-                download_id, pct
-            ),
-        )
-        status = (
-            "finished"
-            if res["status"] == "success"
-            else (
-                "cancelled"
-                if self.download_queue.is_cancelled(download_id)
-                else "error"
+    def _run_playlist_download(self, destination, playlist_name, songs_with_ids):
+        try:
+            playlist_folder = os.path.join(
+                destination, self._safe_playlist_folder_name(playlist_name)
             )
-        )
-        self.download_queue.update_status(download_id, status)
+            os.makedirs(playlist_folder, exist_ok=True)
+            for song, download_id in songs_with_ids:
+                self._run_download(song.get("id", ""), playlist_folder, download_id)
+        except Exception as e:
+            self.error_download.emit(str(e))
 
     @staticmethod
     def _safe_playlist_folder_name(playlist_name):
@@ -88,10 +72,6 @@ class DownloadController(QObject):
         ):
             safe_name = f"_{safe_name}"
         return safe_name
-
-    def _run_playlist_download(self, playlist_folder, songs_with_ids):
-        for song, download_id in songs_with_ids:
-            self._run_download(song.get("id", ""), playlist_folder, download_id)
 
     def _get_download_path(self):
         path = self.settings.value("download_path", "")

@@ -4,8 +4,9 @@ import motor
 
 
 class SearchController(QObject):
-    search_completed = Signal(object)
+    search_completed = Signal(object, int)
     similar_songs_fetched = Signal(list)
+    error_search = Signal(str)
 
     def __init__(self, player_tab, thumbnail_fetcher):
         super().__init__()
@@ -18,11 +19,16 @@ class SearchController(QObject):
         ).start()
 
     def _run_search(self, query, search_version):
-        res = motor.search_bar(query)
-        if search_version == self.player_tab.search_version:
-            self.search_completed.emit(res)
+        try:
+            res = motor.search_bar(query)
+            self.search_completed.emit(res, search_version)
+        except Exception as e:
+            print(f"Error searching: {e}")
+            self.error_search.emit(str(e))
 
-    def process_search_results(self, res):
+    def process_search_results(self, res, search_version):
+        if search_version != self.player_tab.search_version:
+            return
         self.player_tab.search_result(res)
         songs = res if isinstance(res, list) else [res]
         for song in songs:
@@ -37,8 +43,14 @@ class SearchController(QObject):
             ).start()
 
     def _run_similar_songs(self, video_id):
-        songs = motor.get_similar_songs(video_id)
-        for song in songs:
-            if isinstance(song, dict):
-                self.thumbnail_fetcher.download_list_thumbnail(song)
-        self.similar_songs_fetched.emit(songs)
+        songs = []
+        try:
+            songs = motor.get_similar_songs(video_id)
+            for song in songs:
+                if isinstance(song, dict):
+                    self.thumbnail_fetcher.download_list_thumbnail(song)
+        except Exception as e:
+            print(f"Error fetching similar songs: {e}")
+            self.error_search.emit(str(e))
+        finally:
+            self.similar_songs_fetched.emit(songs)
