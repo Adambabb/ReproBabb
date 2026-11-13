@@ -2,6 +2,7 @@ import sys
 from PySide6.QtWidgets import (
     QApplication,
     QMessageBox,
+    QStyleFactory,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -24,6 +25,11 @@ class MainWindow(QObject):
     def __init__(self):
         super().__init__()
         self.app = QApplication(sys.argv)
+        style = QStyleFactory.create("windows11")
+        if style is None:
+            style = QStyleFactory.create("Fusion")
+        if style is not None:
+            self.app.setStyle(style)
         self.window = QWidget()
         self.window.setWindowTitle("ReproBabb")
         self.window.setMinimumSize(640, 420)
