@@ -11,7 +11,7 @@ Search, stream, queue, organize and download music from YouTube Music in a compa
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-22c55e)](LICENSE)
 
-[Features](#features) | [Screenshots](#screenshots) | [Quick start](#quick-start) | [Architecture](#architecture) | [Testing](#testing) | [Limitations](#known-limitations)
+[Demo](#demo) | [Screenshots](#screenshots) | [Features](#features) | [Quick start](#quick-start) | [Architecture](#architecture) | [Testing](#testing) | [Limitations](#known-limitations)
 
 </div>
 
@@ -21,20 +21,13 @@ ReproBabb is an unofficial desktop client for YouTube Music built with **Python*
 
 > **Unofficial client.** ReproBabb is not affiliated with YouTube or Google. Downloading content may violate YouTube's Terms of Service and the rights of content owners. Use it for personal use only and respect copyright.
 
-## Project status
+## Demo
 
-The last tagged release is **v1.0.0**. The `main` branch is ahead of that tag and includes the work listed below. The v1.0.0 ZIP is useful if you want the original tagged build, but it predates these fixes; run from source or wait for the next release if you want the latest code.
+<p align="center">
+  <img src="docs/screenshots/demo.gif" alt="ReproBabb demo showing search, playback, the animated visualizer and queue changes" width="720">
+</p>
 
-| Area | v1.0.0 | Current main |
-| --- | --- | --- |
-| Tests | 82 | **83** |
-| CI | Not configured | **GitHub Actions on Windows** |
-| Account loading | Could block the UI | **Runs in a background thread** |
-| Download controller | Working | **Working; regression from PR #10 fixed** |
-| Error handling | Partial | **Search, library and controller errors are surfaced** |
-| Documentation | Text only | **Screenshots and expanded guide** |
-
-The download-controller regression was introduced when `_run_download` was removed from the controller and was restored in commit `a6c3ad4`. CI now runs the full pytest suite on every push and pull request.
+A 16-second demo recorded from the real application with a local demo queue and synthetic cover art. It shows the search box with results, playback, the animated visualizer and queue changes, and uses no YouTube account, network connection or real listening session.
 
 ## Screenshots
 
@@ -65,6 +58,12 @@ Downloads can be started for a single track or a whole playlist. Progress is upd
 </p>
 
 The mini player keeps the current track, playback controls and queue access available while the main window is hidden.
+
+## Project status
+
+The latest tagged release is **v1.0.1**. It includes the 83-test suite, GitHub Actions CI, background account loading and the download-controller regression fix. The `main` branch adds the forced Windows 11 Qt style, the rewritten README and this demo; run from source for those changes until the next release.
+
+The download-controller regression was introduced when `_run_download` was removed from the controller and was restored in commit `a6c3ad4`. CI runs the full pytest suite on every push and pull request.
 
 ## Features
 
@@ -106,7 +105,7 @@ The mini player keeps the current track, playback controls and queue access avai
 - Optional always-on-top mode for the main window.
 - Decorative bar visualizer that doubles as the seek bar.
 - Accent color derived from the current cover art.
-- Dark QSS theme with native Qt controls.
+- Dark QSS theme with the Windows 11 Qt style when available, with a Fusion fallback.
 
 ## Quick start
 
@@ -136,7 +135,7 @@ On Linux or macOS the activation command is `source .venv/bin/activate`, but tho
 
 ### Run the packaged release
 
-Download the latest ZIP from the [Releases page](https://github.com/Adambabb/ReproBabb/releases), extract it and run `ReproBabb.exe`. The v1.0.0 release predates the fixes listed in [Project status](#project-status); build from `main` for the newest code.
+Download v1.0.1 or newer from the [Releases page](https://github.com/Adambabb/ReproBabb/releases), extract it and run `ReproBabb.exe`. The v1.0.1 build includes the fixes described in [Project status](#project-status); the Windows 11 style, rewritten README and demo on `main` are only available from source until the next release.
 
 ## User guide
 
@@ -250,7 +249,7 @@ ReproBabb/
 |   `-- styles.qss
 |-- assets/                  # Icons, application icon and default cover
 |-- docs/
-|   `-- screenshots/         # README screenshots
+|   `-- screenshots/         # README screenshots and demo GIF
 |-- tests/
 |   |-- test_download_queue.py
 |   |-- test_motor.py
@@ -354,9 +353,9 @@ YouTube frequently changes its internal APIs. Update `yt-dlp` and `ytmusicapi` f
 
 Open **Library**, click **Create Browser**, sign in again and let the app save a fresh `browser.json`.
 
-### The UI looks different on Windows 10 and Windows 11
+### The window frame looks different on Windows 10 and Windows 11
 
-Qt follows the native platform style and the window frame is drawn by Windows. Buttons, tabs and the title bar can therefore have different geometry on each version. The application content uses the same stylesheet; screenshots in this README were taken on Windows 11.
+ReproBabb requests Qt's `windows11` style on both versions and falls back to `Fusion` when that style is unavailable. The title bar and outer window frame are still drawn by Windows, so they remain native to the OS. The application content uses the same QSS theme on both versions; screenshots and the demo were recorded on Windows 11.
 
 ### Tests fail on a fresh checkout
 
